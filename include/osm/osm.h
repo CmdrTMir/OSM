@@ -94,6 +94,7 @@ struct raw_reader {
     return buf{raw_size, *compressed};
   }
 
+  // auch für das andere mmap ding benutzen?
   cista::mmap file_;
   std::string_view rest_{file_.view()};
 };

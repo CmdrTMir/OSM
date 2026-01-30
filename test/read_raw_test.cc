@@ -1,5 +1,8 @@
 #include "osm/osm.h"
 
+#include <ranges>
+#include <string_view>
+
 #include "fmt/ranges.h"
 
 #include "gtest/gtest.h"
@@ -7,8 +10,11 @@
 #include "utl/progress_tracker.h"
 
 #include "osm/decoder.h"
+#include "osm/hnidx/hybrid_node_index.h"
 #include "osm/inflate.h"
 #include "osm/memory.h"
+#include "osm/mp_manager.h"
+#include "osm/parallel.h"
 
 #include "boost/fiber/all.hpp"
 
@@ -54,7 +60,7 @@ TEST(osm, varint) {
 
 TEST(a, b) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/felix/Downloads/germany-latest.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
@@ -127,4 +133,49 @@ TEST(a, b) {
 
   const osmium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
+}
+
+TEST(c, d) {
+  auto r = osm::raw_reader{
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
+                           cista::mmap::protection::READ}};
+
+  auto bars = utl::global_progress_bars{false};
+  auto pt = utl::activate_progress_tracker("parse");
+  pt->in_high(r.rest_.size());
+
+  auto const n_threads = std::thread::hardware_concurrency();
+
+  auto print_mtx = std::mutex{};
+
+  // das soll sich merken wo die ways anfangen, damit man nicht immer alles
+  // durchgehen muss, im file
+  auto first_way_buffer_start_offset = std::atomic_uint64_t{};
+
+  auto mp = osm::multi_polygons{};
+  // PASS 1: nodes & ways
+  osm::decode_primitive_parallel(
+      r, true, false, true,
+      [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {
+        // tiles::hybrid_node_idx_builder node_idx_builder{id};
+        //  TODO update hybrid node builder
+      },
+      [&](std::int64_t, auto&&, auto&&) {},
+      [&](std::int64_t const id, auto&& members, auto&& tags) {
+        osm::save_ways(mp, id, members, tags);
+      },
+      pt);
+
+  // PASS 2: areas (überspringe nodes)
+  osm::decode_primitive_parallel(
+      r, false, true, true, [&](std::int64_t, geo::latlng const&, auto&&) {},
+      [&](std::int64_t const id, auto&& refs, auto&& tags) {
+        // TODO save nodes of ways
+      },
+      [&](std::int64_t const id, auto&& members, auto&& tags) {
+        auto a = osm::assemble_area(mp, id, members, tags);
+        // TODO do something with final area
+        // a.outer_rings()
+      },
+      pt);
 }
