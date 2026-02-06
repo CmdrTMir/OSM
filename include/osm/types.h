@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace osm {
 
@@ -40,8 +41,7 @@ struct Node {
 
 struct NodeRef {
   object_id_type id;
-  osm::Location loc;  // optional gecacht
-
+  osm::Location loc;
   object_id_type ref() const { return id; }
   osm::Location location() const { return loc; }
   void set_location(osm::Location l) { loc = l; }
