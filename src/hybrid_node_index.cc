@@ -4,8 +4,8 @@
 #include <optional>
 #include <tuple>
 
-#include "osm/osmium/mmap_vector_file.h"
-#include "osm/osmium/tmpfile.h"
+#include "osm/filing/mmap_vector_file.h"
+#include "osm/filing/tmpfile.h"
 //#include "osmium/osm/way.hpp"
 //#include "osmium/visitor.hpp"
 
@@ -18,18 +18,15 @@
 #include "osm/hnidx/delta.h"
 #include "osm/hnidx/util.h"
 
-// namespace o = osmium;
-namespace od = osmium::detail;
 namespace pz = protozero;
 
 using pz::decode_varint;
 using pz::decode_zigzag64;
 using pz::skip_varint;
 
-// einheitlich machen!
 using osm_id_t = osm::object_id_type;
 
-namespace tiles {
+namespace shingles {
 
 // dat contains spans which node sets with consecutive node ids
 // there are two kinds of spans
@@ -70,12 +67,12 @@ struct id_offset {
   size_t offset_;
 };
 
-// ersetzte mmap durch vector?
+// ersetzte mmap durch vector oder durch cista::mmap?
 struct hybrid_node_idx::impl {
   impl(int idx_fd, int dat_fd) : idx_{idx_fd}, dat_{dat_fd} {}
 
-  od::mmap_vector_file<id_offset> idx_;
-  od::mmap_vector_file<char> dat_;
+  ium::mmap_vector_file<id_offset> idx_;
+  ium::mmap_vector_file<char> dat_;
 };
 
 uint32_t read_fixed(char const** data) {
@@ -149,9 +146,8 @@ std::optional<fixed_xy> get_coords(hybrid_node_idx const& nodes,
   return std::nullopt;
 }
 
-void get_coords(
-    hybrid_node_idx const& nodes,
-    std::vector<std::pair<osm::object_id_type, osm::Location*>>& queries) {
+void get_coords(hybrid_node_idx const& nodes,
+                std::vector<std::pair<osm_id_t, osm::Location*>>& queries) {
   auto const& idx = nodes.impl_->idx_;
   auto const& dat = nodes.impl_->dat_;
 
@@ -299,6 +295,7 @@ void get_coords(
   }
 }
 
+// hier ist noch ein "Fehler"
 void update_locations(hybrid_node_idx const& nodes, osm::Buffer& buffer) {
   struct query_builder {
     void way(osm::Way& way) {
@@ -306,9 +303,10 @@ void update_locations(hybrid_node_idx const& nodes, osm::Buffer& buffer) {
         query_.emplace_back(node_ref.ref(), &node_ref.location());
       }
     }
-    std::vector<std::pair<osm::object_id_type, osm::Location*>> query_;
+    std::vector<std::pair<osm_id_t, osm::Location*>> query_;
   };
 
+  // TODO!!!
   query_builder builder;
   // o::apply(buffer, builder);
 
@@ -323,8 +321,8 @@ void update_locations(hybrid_node_idx const& nodes, osm::Buffer& buffer) {
 }
 
 hybrid_node_idx::hybrid_node_idx()
-    : impl_{std::make_unique<impl>(od::create_tmp_file(),
-                                   od::create_tmp_file())} {}
+    : impl_{std::make_unique<impl>(ium::create_tmp_file(),
+                                   ium::create_tmp_file())} {}
 hybrid_node_idx::hybrid_node_idx(int idx_fd, int dat_fd)
     : impl_{std::make_unique<impl>(idx_fd, dat_fd)} {}
 hybrid_node_idx::~hybrid_node_idx() = default;
@@ -340,7 +338,7 @@ void hybrid_node_idx::way(osm::Way& way) const {
 }
 
 struct hybrid_node_idx_builder::impl {
-  impl(od::mmap_vector_file<id_offset>& idx, od::mmap_vector_file<char>& dat)
+  impl(ium::mmap_vector_file<id_offset>& idx, ium::mmap_vector_file<char>& dat)
       : nodes_{nullptr}, idx_{idx}, dat_{dat} {}
 
   explicit impl(std::unique_ptr<hybrid_node_idx::impl> nodes)
@@ -472,25 +470,25 @@ struct hybrid_node_idx_builder::impl {
   }
 
   void dump_stats() const {
-    tiles::t_log("index size: {} entries", idx_.size());
-    tiles::t_log("data size: {} bytes", dat_.size());
+    shingles::t_log("index size: {} entries", idx_.size());
+    shingles::t_log("data size: {} bytes", dat_.size());
 
-    tiles::t_log("builder: nodes {}", stat_nodes_);
-    tiles::t_log("builder: spans {}", stat_spans_);
+    shingles::t_log("builder: nodes {}", stat_nodes_);
+    shingles::t_log("builder: spans {}", stat_spans_);
 
     for (auto i = 0ULL; i < stat_coord_chars_.size(); ++i) {
-      tiles::t_log("builder: coord chars {} {}", i, stat_coord_chars_[i]);
+      shingles::t_log("builder: coord chars {} {}", i, stat_coord_chars_[i]);
     }
 
     for (auto i = 0ULL; i < kStatSpanCumSizeLimits.size(); ++i) {
-      tiles::t_log("builder: cum spans <= {:>5} {:>12}",
-                   kStatSpanCumSizeLimits[i], stat_span_cum_sizes_[i]);
+      shingles::t_log("builder: cum spans <= {:>5} {:>12}",
+                      kStatSpanCumSizeLimits[i], stat_span_cum_sizes_[i]);
     }
   }
 
   std::unique_ptr<hybrid_node_idx::impl> nodes_;
-  od::mmap_vector_file<id_offset>& idx_;
-  od::mmap_vector_file<char>& dat_;
+  ium::mmap_vector_file<id_offset>& idx_;
+  ium::mmap_vector_file<char>& dat_;
 
   osm_id_t last_id_ = std::numeric_limits<osm_id_t>::min();
   fixed_xy last_pos_{0, 0};
@@ -518,7 +516,7 @@ hybrid_node_idx_builder::hybrid_node_idx_builder(int idx_fd, int dat_fd)
 
 hybrid_node_idx_builder::~hybrid_node_idx_builder() = default;
 
-void hybrid_node_idx_builder::push(osm::object_id_type const id,
+void hybrid_node_idx_builder::push(osm_id_t const id,
                                    fixed_xy const& coords) const {
   impl_->push(id, coords);
 }
@@ -530,4 +528,4 @@ size_t hybrid_node_idx_builder::get_stat_spans() const {
   return impl_->stat_spans_;
 }
 
-}  // namespace tiles
+}  // namespace shingles

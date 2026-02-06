@@ -10,6 +10,7 @@
 #include "utl/progress_tracker.h"
 
 #include "osm/decoder.h"
+#include "osm/filing/tmp_file.h"
 #include "osm/hnidx/hybrid_node_index.h"
 #include "osm/inflate.h"
 #include "osm/memory.h"
@@ -131,7 +132,7 @@ TEST(a, b) {
   std::cout << "number of ways: " << n_ways << "\n";
   std::cout << "number of relations: " << n_rels << "\n";
 
-  const osmium::MemoryUsage memory;
+  const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
 }
 
@@ -139,6 +140,8 @@ TEST(c, d) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
+
+  std::string const& tmp_dname = "abc";
 
   auto bars = utl::global_progress_bars{false};
   auto pt = utl::activate_progress_tracker("parse");
@@ -153,11 +156,17 @@ TEST(c, d) {
   auto first_way_buffer_start_offset = std::atomic_uint64_t{};
 
   auto mp = osm::multi_polygons{};
-  // PASS 1: nodes & ways
+  auto const node_idx_file = shingles::tmp_file{
+      (std::filesystem::path{tmp_dname} / "idx.bin").generic_string()};
+  auto const node_dat_file = shingles::tmp_file{
+      (std::filesystem::path{tmp_dname} / "dat.bin").generic_string()};
+  shingles::hybrid_node_idx node_idx{node_idx_file.fileno(),
+                                     node_dat_file.fileno()};
+  // tiles::hybrid_node_idx_builder node_idx_builder{id};
+  //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
       r, true, false, true,
       [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {
-        // tiles::hybrid_node_idx_builder node_idx_builder{id};
         //  TODO update hybrid node builder
       },
       [&](std::int64_t, auto&&, auto&&) {},
