@@ -141,7 +141,8 @@ TEST(c, d) {
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
-  std::string const& tmp_dname = "abc";
+  // std::string const& tmp_dname = "abc";
+  auto tmp_dname = std::filesystem::temp_directory_path();
 
   auto bars = utl::global_progress_bars{false};
   auto pt = utl::activate_progress_tracker("parse");
@@ -162,24 +163,32 @@ TEST(c, d) {
       (std::filesystem::path{tmp_dname} / "dat.bin").generic_string()};
   shingles::hybrid_node_idx node_idx{node_idx_file.fileno(),
                                      node_dat_file.fileno()};
-  // tiles::hybrid_node_idx_builder node_idx_builder{id};
+  shingles::hybrid_node_idx_builder node_idx_builder{node_idx};
+
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
       r, true, false, true,
       [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {
-        //  TODO update hybrid node builder
+        osm::Location temp_loc{static_cast<int>(pos.lat()),
+                               static_cast<int>(pos.lng())};
+        // position to location ?
+        osm::Node temp_node{id, temp_loc};
+        node_idx_builder.node(temp_node);
       },
       [&](std::int64_t, auto&&, auto&&) {},
       [&](std::int64_t const id, auto&& members, auto&& tags) {
-        osm::save_ways(mp, id, members, tags);
+        osm::save_ways_of_relation(mp, id, members, tags);
       },
       pt);
+
+  std::cout << "AM I still running? \n";  // NOPE!
 
   // PASS 2: areas (überspringe nodes)
   osm::decode_primitive_parallel(
       r, false, true, true, [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
-        // TODO save nodes of ways
+        // TODO save nodes of ways => update_locations (wo noch ein Fehler drin
+        // ist)
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
         auto a = osm::assemble_area(mp, id, members, tags);
