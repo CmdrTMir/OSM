@@ -20,7 +20,7 @@
 
 namespace bf = boost::fibers;
 
-/*TEST(osm, varint) {
+TEST(osm, varint) {
   auto buf = std::array<char, protozero::max_varint_length * 10U>{};
   auto const n1 =
       protozero::write_varint(buf.data(), protozero::encode_zigzag64(123));
@@ -134,7 +134,7 @@ TEST(a, b) {
   const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
 }
-*/
+
 TEST(c, d) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
