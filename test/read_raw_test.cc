@@ -140,42 +140,29 @@ TEST(c, d) {
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
-  auto tmp_dname = std::filesystem::temp_directory_path();
-
   auto bars = utl::global_progress_bars{false};
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
 
-  auto const n_threads = std::thread::hardware_concurrency();
-
-  auto print_mtx = std::mutex{};
+  // auto vec_mtx = std::mutex{};
 
   // das soll sich merken wo die ways anfangen, damit man nicht immer alles
   // durchgehen muss, im file
   auto first_way_buffer_start_offset = std::atomic_uint64_t{};
 
-  auto mp = osm::multi_polygons{};
-  auto const node_idx_file = tiles::tmp_file{
-      (std::filesystem::path{tmp_dname} / "idx.bin").generic_string()};
-  auto const node_dat_file = tiles::tmp_file{
-      (std::filesystem::path{tmp_dname} / "dat.bin").generic_string()};
-  tiles::hybrid_node_idx node_idx{node_idx_file.fileno(),
-                                  node_dat_file.fileno()};
-  tiles::hybrid_node_idx_builder node_idx_builder{node_idx};
+  // auto mp_vec = std::vector<osm::multi_polygon>{};
+  auto mp = osm::multi_polygon{};
 
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
       r, true, false, true,
-      [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {
-        osm::Location temp_loc{static_cast<int>(pos.lat()),
-                               static_cast<int>(pos.lng())};
-        // position to location ?
-        osm::Node temp_node{id, temp_loc};
-        node_idx_builder.node(temp_node);
-      },
+      [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {},
       [&](std::int64_t, auto&&, auto&&) {},
       [&](std::int64_t const id, auto&& members, auto&& tags) {
-        osm::save_ways_of_relation(mp, id, members, tags);
+        // auto mp = osm::multi_polygon{};
+        // osm::save_ways_of_relation(mp, id, members, tags);
+        // std::lock_guard<std::mutex> lock(vec_mtx);
+        // mp_vec.emplace_back(mp);
       },
       pt);
 
@@ -187,9 +174,10 @@ TEST(c, d) {
         // ist)
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
-        auto a = osm::assemble_area(mp, id, members, tags);
-        // TODO do something with final area
-        // a.outer_rings()
+        // auto mp = osm::multi_polygons{};
+        // auto a = osm::assemble_area(mp, id, members, tags);
+        //  TODO do something with final area
+        //  a.outer_rings()
       },
       pt);
 }

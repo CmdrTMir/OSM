@@ -6,13 +6,13 @@
 
 namespace osm {
 
-struct polygon {};
+// struct polygon {};
 
-struct multi_polygons {
+struct multi_polygon {
   std::vector<std::int64_t> ways_;
   std::vector<std::vector<std::int64_t>> way_nodes_;
 
-  std::vector<polygon> multipolygon_;
+  // std::vector<polygon> multipolygon_;
 };
 
 // gemacht um immer wieder zu verwenden... noch füllen
@@ -33,7 +33,7 @@ inline bool is_area(Tags&& tags) {
 }
 
 template <typename Members, typename Tags>
-void save_ways_of_relation(multi_polygons& mp,
+void save_ways_of_relation(multi_polygon& mp,
                            std::int64_t const id,
                            Members&& members,
                            Tags&& tags) {
@@ -49,7 +49,7 @@ void save_ways_of_relation(multi_polygons& mp,
 }
 
 template <typename Members, typename Tags>
-std::optional<polygon_area> assemble_area(multi_polygons& mp,
+std::optional<polygon_area> assemble_area(multi_polygon& mp,
                                           std::int64_t const id,
                                           Members&& members,
                                           Tags&& tags) {
