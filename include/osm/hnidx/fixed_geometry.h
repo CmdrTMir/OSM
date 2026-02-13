@@ -14,7 +14,7 @@
 
 //#include "mpark/variant.hpp"
 
-namespace shingles {
+namespace tiles {
 
 using fixed_coord_t = int64_t;
 
@@ -50,15 +50,15 @@ using fixed_polygon =
 using fixed_geometry =
     std::variant<fixed_null, fixed_point, fixed_polyline, fixed_polygon>;
 
-}  // namespace shingles
+}  // namespace tiles
 
 namespace boost {
 namespace geometry {
 namespace model {
 namespace d2 {
 
-inline bool operator==(point_xy<shingles::fixed_coord_t> const& lhs,
-                       point_xy<shingles::fixed_coord_t> const& rhs) {
+inline bool operator==(point_xy<tiles::fixed_coord_t> const& lhs,
+                       point_xy<tiles::fixed_coord_t> const& rhs) {
   return std::tie(lhs.x(), lhs.y()) == std::tie(rhs.x(), rhs.y());
 }
 

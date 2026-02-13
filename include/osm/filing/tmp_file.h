@@ -10,7 +10,7 @@
 
 #include "utl/verify.h"
 
-namespace shingles {
+namespace tiles {
 
 struct tmp_file {
   explicit tmp_file(std::filesystem::path path)
@@ -43,4 +43,4 @@ struct tmp_file {
   FILE* file_;
 };
 
-}  // namespace shingles
+}  // namespace tiles

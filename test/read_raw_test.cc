@@ -1,5 +1,3 @@
-#include "osm/osm.h"
-
 #include <ranges>
 #include <string_view>
 
@@ -15,13 +13,14 @@
 #include "osm/inflate.h"
 #include "osm/memory.h"
 #include "osm/mp_manager.h"
+#include "osm/osm.h"
 #include "osm/parallel.h"
 
 #include "boost/fiber/all.hpp"
 
 namespace bf = boost::fibers;
 
-TEST(osm, varint) {
+/*TEST(osm, varint) {
   auto buf = std::array<char, protozero::max_varint_length * 10U>{};
   auto const n1 =
       protozero::write_varint(buf.data(), protozero::encode_zigzag64(123));
@@ -135,13 +134,12 @@ TEST(a, b) {
   const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
 }
-
+*/
 TEST(c, d) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
-  // std::string const& tmp_dname = "abc";
   auto tmp_dname = std::filesystem::temp_directory_path();
 
   auto bars = utl::global_progress_bars{false};
@@ -157,13 +155,13 @@ TEST(c, d) {
   auto first_way_buffer_start_offset = std::atomic_uint64_t{};
 
   auto mp = osm::multi_polygons{};
-  auto const node_idx_file = shingles::tmp_file{
+  auto const node_idx_file = tiles::tmp_file{
       (std::filesystem::path{tmp_dname} / "idx.bin").generic_string()};
-  auto const node_dat_file = shingles::tmp_file{
+  auto const node_dat_file = tiles::tmp_file{
       (std::filesystem::path{tmp_dname} / "dat.bin").generic_string()};
-  shingles::hybrid_node_idx node_idx{node_idx_file.fileno(),
-                                     node_dat_file.fileno()};
-  shingles::hybrid_node_idx_builder node_idx_builder{node_idx};
+  tiles::hybrid_node_idx node_idx{node_idx_file.fileno(),
+                                  node_dat_file.fileno()};
+  tiles::hybrid_node_idx_builder node_idx_builder{node_idx};
 
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
@@ -181,9 +179,7 @@ TEST(c, d) {
       },
       pt);
 
-  std::cout << "AM I still running? \n";  // NOPE!
-
-  // PASS 2: areas (überspringe nodes)
+  // PASS 2: areas
   osm::decode_primitive_parallel(
       r, false, true, true, [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {

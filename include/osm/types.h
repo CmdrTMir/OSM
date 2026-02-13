@@ -8,10 +8,8 @@ namespace osm {
 static const int coordinate_precision = 10000000;
 using object_id_type = std::int64_t;
 
-struct Buffer {};
-
+// use geo?
 struct Location {
-  // std::int64_t id_;
   std::int32_t x_;  // change to double?
   std::int32_t y_;
   constexpr Location(const std::int32_t x, const std::int32_t y) noexcept
@@ -42,8 +40,8 @@ struct Node {
 struct NodeRef {
   object_id_type id;
   osm::Location loc;
-  object_id_type ref() const { return id; }
-  osm::Location location() const { return loc; }
+  constexpr object_id_type ref() const { return id; }
+  constexpr osm::Location location() const { return loc; }
   void set_location(osm::Location l) { loc = l; }
 };
 

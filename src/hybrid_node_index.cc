@@ -12,7 +12,6 @@
 #include "protozero/varint.hpp"
 #include "utl/verify.h"
 
-// sind ja theoretisch da im motis
 //#include "tiles/fixed/algo/delta.h"
 //#include "tiles/util.h"
 #include "osm/hnidx/delta.h"
@@ -26,7 +25,7 @@ using pz::skip_varint;
 
 using osm_id_t = osm::object_id_type;
 
-namespace shingles {
+namespace tiles {
 
 // dat contains spans which node sets with consecutive node ids
 // there are two kinds of spans
@@ -67,7 +66,7 @@ struct id_offset {
   size_t offset_;
 };
 
-// ersetzte mmap durch vector oder durch cista::mmap?
+// ersetzte mmap durch cista::mmap?
 struct hybrid_node_idx::impl {
   impl(int idx_fd, int dat_fd) : idx_{idx_fd}, dat_{dat_fd} {}
 
@@ -295,18 +294,19 @@ void get_coords(hybrid_node_idx const& nodes,
   }
 }
 
-// hier ist noch ein "Fehler"
-void update_locations(hybrid_node_idx const& nodes, osm::Buffer& buffer) {
+// hier ist noch ein Fehler
+void update_locations(hybrid_node_idx const& nodes,
+                      boost::asio::const_buffer& buffer) {
   struct query_builder {
-    void way(osm::Way& way) {
-      for (auto& node_ref : way.nodes()) {
-        query_.emplace_back(node_ref.ref(), &node_ref.location());
-      }
-    }
+    // void way(osm::Way& way) {
+    //   for (auto& node_ref : way.nodes()) {
+    //     query_.emplace_back(node_ref.ref(), &node_ref.location());
+    //   }
+    // }
     std::vector<std::pair<osm_id_t, osm::Location*>> query_;
   };
 
-  // TODO!!!
+  // TODO
   query_builder builder;
   // o::apply(buffer, builder);
 
@@ -470,19 +470,19 @@ struct hybrid_node_idx_builder::impl {
   }
 
   void dump_stats() const {
-    shingles::t_log("index size: {} entries", idx_.size());
-    shingles::t_log("data size: {} bytes", dat_.size());
+    tiles::t_log("index size: {} entries", idx_.size());
+    tiles::t_log("data size: {} bytes", dat_.size());
 
-    shingles::t_log("builder: nodes {}", stat_nodes_);
-    shingles::t_log("builder: spans {}", stat_spans_);
+    tiles::t_log("builder: nodes {}", stat_nodes_);
+    tiles::t_log("builder: spans {}", stat_spans_);
 
     for (auto i = 0ULL; i < stat_coord_chars_.size(); ++i) {
-      shingles::t_log("builder: coord chars {} {}", i, stat_coord_chars_[i]);
+      tiles::t_log("builder: coord chars {} {}", i, stat_coord_chars_[i]);
     }
 
     for (auto i = 0ULL; i < kStatSpanCumSizeLimits.size(); ++i) {
-      shingles::t_log("builder: cum spans <= {:>5} {:>12}",
-                      kStatSpanCumSizeLimits[i], stat_span_cum_sizes_[i]);
+      tiles::t_log("builder: cum spans <= {:>5} {:>12}",
+                   kStatSpanCumSizeLimits[i], stat_span_cum_sizes_[i]);
     }
   }
 
@@ -528,4 +528,4 @@ size_t hybrid_node_idx_builder::get_stat_spans() const {
   return impl_->stat_spans_;
 }
 
-}  // namespace shingles
+}  // namespace tiles

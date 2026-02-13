@@ -21,26 +21,15 @@ struct polygon_area {
   // void reset() {}
 };
 
-// WIP
 template <typename Tags>
 inline bool is_area(Tags&& tags) {
-  int count = 0;
   for (auto const& [key, value] : tags) {
-    if (key == "type") {
-      count++;
+    // std::strcmp(type, "multipolygon")
+    if (key == "type" && (value == "multipolygon" || value == "boundary")) {
+      return true;
     }
-    std::cout << "key: " << key << "   value: " << value << "\n";
   }
-  std::cout << "counted " << count << " type-tags \n";
-  const char* type = "";  // = tags.get_value_by_key("type");
-  if (type == nullptr) {
-    return false;
-  }
-  if ((!std::strcmp(type, "multipolygon")) ||
-      (!std::strcmp(type, "boundary"))) {
-    return false;
-  }
-  return true;
+  return false;
 }
 
 template <typename Members, typename Tags>

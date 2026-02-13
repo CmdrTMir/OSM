@@ -17,7 +17,7 @@
 #include "utl/progress_tracker.h"
 #include "utl/verify.h"
 
-namespace shingles {
+namespace tiles {
 template <typename... Args>
 inline void t_log(fmt::format_string<Args...> fmt_str, Args&&... args) {
   using clock = std::chrono::system_clock;
@@ -123,19 +123,19 @@ struct printable_bytes {
   double n_;
 };
 
-}  // namespace shingles
+}  // namespace tiles
 
 namespace fmt {
 
 template <>
-struct formatter<shingles::printable_num> {
+struct formatter<tiles::printable_num> {
   template <typename ParseContext>
   constexpr auto parse(ParseContext& ctx) const {
     return ctx.begin();
   }
 
   template <typename FormatContext>
-  auto format(shingles::printable_num const& num, FormatContext& ctx) const {
+  auto format(tiles::printable_num const& num, FormatContext& ctx) const {
     auto const n = num.n_;
     auto const k = n / 1e3;
     auto const m = n / 1e6;
@@ -153,14 +153,14 @@ struct formatter<shingles::printable_num> {
 };
 
 template <>
-struct formatter<shingles::printable_ns> {
+struct formatter<tiles::printable_ns> {
   template <typename ParseContext>
   constexpr auto parse(ParseContext& ctx) const {
     return ctx.begin();
   }
 
   template <typename FormatContext>
-  auto format(shingles::printable_ns const& num, FormatContext& ctx) const {
+  auto format(tiles::printable_ns const& num, FormatContext& ctx) const {
     auto const ns = num.n_;
     auto const mys = ns / 1e3;
     auto const ms = ns / 1e6;
@@ -178,15 +178,14 @@ struct formatter<shingles::printable_ns> {
 };
 
 template <>
-struct formatter<shingles::printable_bytes> {
+struct formatter<tiles::printable_bytes> {
   template <typename ParseContext>
   constexpr auto parse(ParseContext& ctx) {
     return ctx.begin();
   }
 
   template <typename FormatContext>
-  auto format(shingles::printable_bytes const& bytes,
-              FormatContext& ctx) const {
+  auto format(tiles::printable_bytes const& bytes, FormatContext& ctx) const {
     auto const n = bytes.n_;
     auto const k = n / 1024;
     auto const m = n / (1024 * 1024);
@@ -205,7 +204,7 @@ struct formatter<shingles::printable_bytes> {
 
 }  // namespace fmt
 
-namespace shingles {
+namespace tiles {
 
 inline uint32_t stou(std::string_view sv) {
   uint32_t var = 0;
@@ -231,4 +230,4 @@ struct regex_matcher {
   std::unique_ptr<impl> impl_;
 };
 
-}  // namespace shingles
+}  // namespace tiles

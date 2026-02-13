@@ -4,7 +4,7 @@
 
 #include "osm/hnidx/fixed_geometry.h"
 
-namespace shingles {
+namespace tiles {
 
 struct delta_encoder {
   explicit delta_encoder(fixed_coord_t init) : curr_(init) {}
@@ -34,4 +34,4 @@ struct delta_decoder {
   fixed_coord_t curr_;
 };
 
-}  // namespace shingles
+}  // namespace tiles

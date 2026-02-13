@@ -4,12 +4,12 @@
 #include <optional>
 
 //#include "osmium/memory/buffer.hpp"
-
+#include "boost/asio/buffer.hpp"
 #include "../types.h"
 #include "convert.h"
 #include "fixed_geometry.h"
 
-namespace shingles {
+namespace tiles {
 
 struct hybrid_node_idx {
 
@@ -38,7 +38,7 @@ std::optional<fixed_xy> get_coords(hybrid_node_idx const&,
 void get_coords(hybrid_node_idx const&,
                 std::vector<std::pair<osm::object_id_type, osm::Location*>>&);
 
-void update_locations(hybrid_node_idx const&, osm::Buffer&);
+void update_locations(hybrid_node_idx const&, boost::asio::const_buffer&);
 
 struct hybrid_node_idx_builder {
   explicit hybrid_node_idx_builder(hybrid_node_idx&);
@@ -68,4 +68,4 @@ struct hybrid_node_idx_builder {
   std::unique_ptr<impl> impl_;
 };
 
-}  // namespace shingles
+}  // namespace tiles

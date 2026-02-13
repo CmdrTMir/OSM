@@ -5,7 +5,7 @@
 
 #include "fixed_geometry.h"
 
-namespace shingles {
+namespace tiles {
 
 inline fixed_xy latlng_to_fixed(geo::latlng const& pos) {
   auto const px_xy =
@@ -22,4 +22,4 @@ inline geo::latlng fixed_to_latlng(fixed_xy const& pos) {
        proj::pixel_to_merc_y(pos.y(), kFixedDefaultZoomLevel)});
 }
 
-}  // namespace shingles
+}  // namespace tiles
