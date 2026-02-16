@@ -19,7 +19,7 @@
 #include "boost/fiber/all.hpp"
 
 namespace bf = boost::fibers;
-
+/*
 TEST(osm, varint) {
   auto buf = std::array<char, protozero::max_varint_length * 10U>{};
   auto const n1 =
@@ -134,7 +134,7 @@ TEST(a, b) {
   const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
 }
-
+*/
 TEST(c, d) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
@@ -144,14 +144,14 @@ TEST(c, d) {
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
 
-  // auto vec_mtx = std::mutex{};
+  auto vec_mtx = std::mutex{};
 
   // das soll sich merken wo die ways anfangen, damit man nicht immer alles
   // durchgehen muss, im file
   auto first_way_buffer_start_offset = std::atomic_uint64_t{};
 
-  // auto mp_vec = std::vector<osm::multi_polygon>{};
-  auto mp = osm::multi_polygon{};
+  auto mp_vec = std::vector<osm::multi_polygon>{};
+  // auto mp = osm::multi_polygon{};
 
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
@@ -159,12 +159,14 @@ TEST(c, d) {
       [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {},
       [&](std::int64_t, auto&&, auto&&) {},
       [&](std::int64_t const id, auto&& members, auto&& tags) {
-        // auto mp = osm::multi_polygon{};
-        // osm::save_ways_of_relation(mp, id, members, tags);
-        // std::lock_guard<std::mutex> lock(vec_mtx);
-        // mp_vec.emplace_back(mp);
+        auto mp = osm::multi_polygon{};
+        osm::save_ways_of_relation(mp, id, members, tags);
+        std::lock_guard<std::mutex> lock(vec_mtx);
+        mp_vec.emplace_back(mp);
       },
       pt);
+
+  std::cout << "In the middle: " << mp_vec.size() << std::endl;
 
   // PASS 2: areas
   osm::decode_primitive_parallel(

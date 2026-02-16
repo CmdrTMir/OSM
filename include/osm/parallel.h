@@ -5,11 +5,13 @@
 #include "osm.h"
 #include "osm/decoder.h"
 #include "osm/inflate.h"
+#include "osm/lock_queue.h"
 #include "osm/memory.h"
 
 #include "utl/progress_tracker.h"
 
 #include "boost/fiber/all.hpp"
+#include "boost/lockfree/queue.hpp"
 
 namespace osm {
 
@@ -22,13 +24,13 @@ void decode_primitive_parallel(osm::raw_reader& r,
                                WayFn&& on_way,
                                RelFn&& on_rel,
                                utl::progress_tracker_ptr pt) {
-  namespace bf = boost::fibers;
+  // namespace bf = boost::fibers;
 
   auto const n_threads = std::thread::hardware_concurrency();
   auto pool = std::vector<std::thread>{n_threads};
-  auto await_fibers_mtx = std::mutex{};
-  auto await_fibers_cv = bf::condition_variable_any{};
-  std::atomic<int> active{n_threads};
+  // auto await_threads_mtx = std::mutex{};
+  // auto await_threads_cv = std::condition_variable{};
+  // std::atomic<int> active{pool.size()};
 
   std::atomic<std::uint64_t> next_block_id{0};
   struct WorkItem {
@@ -39,46 +41,46 @@ void decode_primitive_parallel(osm::raw_reader& r,
     std::uint64_t block_id;
     std::shared_ptr<std::vector<osm::Node>> nodes;
   };
-  auto merge_channel = bf::buffered_channel<MergeItem>{64U};
 
-  auto ch = bf::buffered_channel<WorkItem>{64U};
-  // for (auto i = 0U; i != n_threads; ++i) {
+  // bf::use_scheduling_algorithm<bf::algo::work_stealing>(n_threads + 1U);
+  auto merge_queue = osm::LockQueue<MergeItem>{};
+  auto prod_queue = osm::LockQueue<WorkItem>{};
+  // auto prod_queue = boost::lockfree::queue<MergeItem>{128};
+  //  auto merge_channel = bf::buffered_channel<MergeItem>{64U};
+  //  auto ch = bf::buffered_channel<WorkItem>{64U};
+  //   for (auto i = 0U; i != n_threads; ++i) {
   for (auto& t : pool) {
     t = std::thread{[&]() {
-      bf::use_scheduling_algorithm<bf::algo::work_stealing>(n_threads);
-      bf::fiber([&]() {
-        auto decompressor = osm::inflate{};
-        auto out = std::string{};
-        auto strings = std::vector<std::string_view>{};
+      // bf::use_scheduling_algorithm<bf::algo::work_stealing>(n_threads);
+      // bf::fiber([&]() {
+      auto decompressor = osm::inflate{};
+      auto out = std::string{};
+      auto strings = std::vector<std::string_view>{};
 
-        for (auto work : ch) {
-          // auto local_nodes = std::vector<osm::Node>{};
-          auto local_nodes = std::make_shared<std::vector<osm::Node>>();
-          auto on_node_local = [&](std::int64_t const id,
-                                   geo::latlng const& pos, auto&& tags) {
-            osm::Location temp_loc{static_cast<int>(pos.lat()),
-                                   static_cast<int>(pos.lng())};
-            osm::Node temp_node{id, temp_loc};
-            local_nodes->emplace_back(temp_node);
-          };
+      // for (auto work : prod_queue) {
+      while (auto work = prod_queue.pop()) {
+        // auto local_nodes = std::vector<osm::Node>{};
+        auto local_nodes = std::make_shared<std::vector<osm::Node>>();
+        auto on_node_local = [&](std::int64_t const id, geo::latlng const& pos,
+                                 auto&& tags) {
+          osm::Location temp_loc{static_cast<int>(pos.lat()),
+                                 static_cast<int>(pos.lng())};
+          osm::Node temp_node{id, temp_loc};
+          local_nodes->emplace_back(temp_node);
+        };
 
-          out.resize(work.buffer.raw_size_);
-          decompressor.decompress(work.buffer.compressed_, out);
-          osm::decode_primitive(out, strings, read_nodes, read_ways,
-                                read_relations, on_node_local, on_way, on_rel);
+        out.resize(work->buffer.raw_size_);
+        decompressor.decompress(work->buffer.compressed_, out);
+        osm::decode_primitive(out, strings, read_nodes, read_ways,
+                              read_relations, on_node_local, on_way, on_rel);
 
-          // Optional: sortiere lokal nach ID (sicher)
-          // std::sort(local_nodes.begin(), local_nodes.end(),
-          //          [](auto const& a, auto const& b) { return a.id < b.id; });
-          // merge_channel.push({work.block_id, std::move(local_nodes)});
-          merge_channel.push({work.block_id, local_nodes});
-          std::lock_guard lk(await_fibers_mtx);
-          active--;
-        }
-        await_fibers_cv.notify_one();
-        std::cout << "worker exiting\n";
-      }).detach();
-      boost::this_fiber::yield();
+        // merge_channel.push({work.block_id, std::move(local_nodes)});
+        // merge_channel.push({work.block_id, local_nodes});
+        merge_queue.push({work->block_id, local_nodes});
+      }
+      // }).detach();
+      //  await_fibers_cv.notify_one();
+      //  boost::this_fiber::yield();
     }};
   }
 
@@ -95,10 +97,11 @@ void decode_primitive_parallel(osm::raw_reader& r,
     auto next_expected = std::uint64_t{0};
     auto items_pending =
         std::map<std::uint64_t, std::shared_ptr<std::vector<osm::Node>>>{};
-    for (auto const& item : merge_channel) {
-      items_pending.emplace(item.block_id, std::move(item.nodes));
+    // for (auto const& item : merge_channel) {
+    while (auto item = merge_queue.pop()) {
+      items_pending.emplace(item->block_id, std::move(item->nodes));
 
-      // normal map: if key there count = 1
+      // normal map: if key is there count = 1
       while (items_pending.count(next_expected)) {
         auto& vec = items_pending[next_expected];
         for (auto& node : *vec) {
@@ -117,9 +120,9 @@ void decode_primitive_parallel(osm::raw_reader& r,
 
   // for (auto& t : pool) {
   //   t = std::thread{[&]() {
-  //     bf::use_scheduling_algorithm<bf::algo::work_stealing>(n_threads + 1U);
-  //     auto l = std::unique_lock{fin_mutex};
-  //     fin_cv.wait(l, [&]() { return fin.load(); });
+  //     bf::use_scheduling_algorithm<bf::algo::work_stealing>(n_threads +
+  //     1U); auto l = std::unique_lock{fin_mutex}; fin_cv.wait(l, [&]() {
+  //     return fin.load(); });
   //   }};
   // }
 
@@ -132,25 +135,27 @@ void decode_primitive_parallel(osm::raw_reader& r,
     WorkItem item;
     item.block_id = next_block_id++;
     item.buffer = std::move(*buf);
-    ch.push(std::move(item));
+    prod_queue.push(std::move(item));
     // ch.push(*buf);
     pt->update(r.file_.size() - r.rest_.size());
   }
+  prod_queue.set_done();
 
-  ch.close();
-  std::cout << "ch closed\n";
-  {
-    std::unique_lock lk(await_fibers_mtx);
-    await_fibers_cv.wait(lk, [&] { return active == 0; });
-  }
-  merge_channel.close();
-  std::cout << "merge ch closed\n";
+  // ch.close();
+  // std::cout << "ch closed\n";
+  //{
+  //   std::unique_lock lock(await_fibers_mtx);
+  //   await_fibers_cv.wait(lock, [&] { return active == 0; });
+  // }
+  // merge_channel.close();
+  // std::cout << "merge ch closed\n";
   // fin.store(true);
   // fin_cv.notify_all();
 
   for (auto& t : pool) {
     t.join();
   }
+  merge_queue.set_done();
   merger_thread.join();
 }
 
