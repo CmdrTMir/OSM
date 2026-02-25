@@ -127,9 +127,9 @@ TEST(a, b) {
     t.join();
   }
 
-  std::cout << "number of nodes: " << n_nodes << "\n";
-  std::cout << "number of ways: " << n_ways << "\n";
-  std::cout << "number of relations: " << n_rels << "\n";
+  std::cout << "number of nodes: " << n_nodes << "\n";  // 7674356
+  std::cout << "number of ways: " << n_ways << "\n";  // 1276568
+  std::cout << "number of relations: " << n_rels << "\n";  // 17929
 
   const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
@@ -145,20 +145,29 @@ TEST(c, d) {
   pt->in_high(r.rest_.size());
 
   auto vec_mtx = std::mutex{};
-
-  // das soll sich merken wo die ways anfangen, damit man nicht immer alles
-  // durchgehen muss, im file
-  auto first_way_buffer_start_offset = std::atomic_uint64_t{};
-
   auto mp_vec = std::vector<osm::multi_polygon>{};
   // auto mp = osm::multi_polygon{};
+  std::atomic_uint64_t relations_count = 0;
+  std::atomic_uint64_t ways_count = 0;
+  std::atomic_uint64_t relations_count2 = 0;
+  std::atomic_uint64_t ways_count2 = 0;
+
+  auto tmp_dname = std::filesystem::temp_directory_path();
+  auto const node_idx_file = tiles::tmp_file{
+      (std::filesystem::path{tmp_dname} / "idx.bin").generic_string()};
+  auto const node_dat_file = tiles::tmp_file{
+      (std::filesystem::path{tmp_dname} / "dat.bin").generic_string()};
+  tiles::hybrid_node_idx node_idx{node_idx_file.fileno(),
+                                  node_dat_file.fileno()};
+  tiles::hybrid_node_idx_builder node_idx_builder{node_idx};
 
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
-      r, true, false, true,
+      r, node_idx_builder, true, false, true,
       [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {},
-      [&](std::int64_t, auto&&, auto&&) {},
+      [&](std::int64_t, auto&&, auto&&) { ways_count++; },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
+        relations_count++;
         auto mp = osm::multi_polygon{};
         osm::save_ways_of_relation(mp, id, members, tags);
         std::lock_guard<std::mutex> lock(vec_mtx);
@@ -166,20 +175,31 @@ TEST(c, d) {
       },
       pt);
 
-  std::cout << "In the middle: " << mp_vec.size() << std::endl;
+  std::cout << " \t In the middle: " << std::endl;
+  std::cout << "vec_size: " << mp_vec.size()
+            << " relations_count: " << relations_count
+            << " ways_count (0): " << ways_count << std::endl;
 
+  r.reset_reader();
   // PASS 2: areas
   osm::decode_primitive_parallel(
-      r, false, true, true, [&](std::int64_t, geo::latlng const&, auto&&) {},
+      r, node_idx_builder, false, true, true,
+      [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
-        // TODO save nodes of ways => update_locations (wo noch ein Fehler drin
+        ways_count2++;
+        // TODO save nodes of ways => update_locations (wo noch ein Fehler
         // ist)
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
+        relations_count2++;
         // auto mp = osm::multi_polygons{};
         // auto a = osm::assemble_area(mp, id, members, tags);
         //  TODO do something with final area
         //  a.outer_rings()
       },
       pt);
+
+  std::cout << " \t At the end: " << std::endl;
+  std::cout << "relations_count2: " << relations_count2
+            << " ways_count2 (1276568): " << ways_count2 << std::endl;
 }
