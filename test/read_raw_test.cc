@@ -187,8 +187,9 @@ TEST(c, d) {
       [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
         ways_count2++;
-        // TODO save nodes of ways => update_locations (wo noch ein Fehler
-        // ist)
+        // TODO save nodes of ways
+        osm::Way tempway = osm::save_nodes_of_ways(node_idx, id, refs);
+        tiles::update_locations_of_way(node_idx, tempway);
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
         relations_count2++;

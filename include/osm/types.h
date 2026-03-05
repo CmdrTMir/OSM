@@ -5,13 +5,15 @@
 
 namespace osm {
 
+static const int undefined_coordinate = 2147483647;
 static const int coordinate_precision = 10000000;
 using object_id_type = std::int64_t;
 
-// use geo?
+// use geo? or change to double?
 struct Location {
-  std::int32_t x_;  // change to double?
+  std::int32_t x_;
   std::int32_t y_;
+  Location() : x_(undefined_coordinate), y_(undefined_coordinate) {}
   constexpr Location(const std::int32_t x, const std::int32_t y) noexcept
       : x_(x), y_(y) {}
   constexpr std::int32_t x() const noexcept { return x_; }
@@ -23,6 +25,25 @@ struct Location {
   Location& set_y(const std::int32_t y) noexcept {
     y_ = y;
     return *this;
+  }
+  constexpr bool valid() const noexcept {
+    return x_ >= -180 * coordinate_precision &&
+           x_ <= 180 * coordinate_precision &&
+           y_ >= -90 * coordinate_precision && y_ <= 90 * coordinate_precision;
+  }
+  bool equal_to(const Location& other_location) const {
+    return x_ == other_location.x() && y_ == other_location.y();
+  }
+  bool smaller_than(const Location& other_location) const {
+    return (x_ == other_location.x() && y_ < other_location.y()) ||
+           x_ < other_location.x();
+  }
+  bool greater_than(const Location& other_location) const {
+    return (other_location.x() == x_ && other_location.y() < y_) ||
+           other_location.x() < x_;
+  }
+  bool is_there() const {
+    return x_ != undefined_coordinate && y_ != undefined_coordinate;
   }
 };
 
@@ -46,9 +67,21 @@ struct NodeRef {
 };
 
 struct Way {
+  object_id_type id;
   std::vector<NodeRef> node_refs;
 
   std::vector<NodeRef> nodes() const { return node_refs; }
+  bool ends_have_same_id() const noexcept {
+    // assert(!nodes().empty());
+    return nodes().front().ref() == nodes().back().ref();
+  }
+};
+
+template <typename Members>
+struct Relation {
+  object_id_type id;
+  Members mmembers;
+  constexpr Members members() const { return mmembers; }
 };
 
 }  // namespace osm
