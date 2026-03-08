@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -10,13 +12,13 @@
 #include <utility>
 #include <vector>
 
-#include "assembler/problem_reporter.h"
-#include "assembler/vec.h"
 #include "osm/types.h"
+#include "problem_reporter.h"
+#include "vec.h"
 
 namespace assembler {
 
-enum class role_type : uint8_t { unknown = 0, outer = 1, inner = 2, empty = 3 };
+enum role_type : uint8_t { unknown = 0, outer = 1, inner = 2, empty = 3 };
 /**
  * This helper class for the Assembler class models a segment,
  * the connection between two nodes.
@@ -26,29 +28,19 @@ enum class role_type : uint8_t { unknown = 0, outer = 1, inner = 2, empty = 3 };
  * x coordinate, and, if they are the same, smaller y coordinate.
  */
 struct NodeRefSegment {
-
-  // First node in order described above.
   osm::NodeRef first_noderef_;
-  // Second node in order described above.
   osm::NodeRef second_noderef_;
-  // Way this segment was from.
   const osm::Way* way_ = nullptr;
-
   // The ring this segment is part of. Initially nullptr, this
   // will be filled in once we know which ring the segment is in.
   // ProtoRing* m_ring = nullptr;
-
-  // The role of this segment from the member role.
   role_type m_role = role_type::unknown;
-
   // Nodes have to be reversed to get the intended order.
   bool reverse_ = false;
-
   // We found the right direction for this segment in the ring.
   // (This depends on whether it is an inner or outer ring.)
   bool m_direction_done = false;
 
-public:
   NodeRefSegment() noexcept = default;
   NodeRefSegment(const osm::NodeRef& nr1,
                  const osm::NodeRef& nr2,
@@ -106,13 +98,52 @@ public:
    * The "determinant" of this segment. Used for calculating
    * the winding order of a ring.
    */
-  //   int64_t det() const noexcept {
-  //     const vec a{start()};
-  //     const vec b{stop()};
-  //     return a * b;
-  //   }
+  int64_t det() const noexcept {
+    const vec a{start()};
+    const vec b{stop()};
+    return a * b;
+  }
 
 };  // struct NodeRefSegment
+
+inline bool operator==(const NodeRefSegment& lhs,
+                       const NodeRefSegment& rhs) noexcept {
+  return lhs.first().location().equal_to(rhs.first().location()) &&
+         lhs.second().location().equal_to(rhs.second().location());
+}
+inline bool operator!=(const NodeRefSegment& lhs,
+                       const NodeRefSegment& rhs) noexcept {
+  return !(lhs == rhs);
+}
+
+/**
+ * A NodeRefSegment is "smaller" if the first point is to the
+ * left and down of the first point of the second segment.
+ * If both first points are the same, the segment with the higher
+ * slope comes first. If the slope is the same, the shorter
+ * segment comes first.
+ */
+inline bool operator<(const NodeRefSegment& lhs,
+                      const NodeRefSegment& rhs) noexcept {
+  if (lhs.first().location().equal_to(rhs.first().location())) {
+    const vec p0{lhs.first().location()};
+    const vec p1{lhs.second().location()};
+    const vec q0{rhs.first().location()};
+    const vec q1{rhs.second().location()};
+    const vec p = p1 - p0;
+    const vec q = q1 - q0;
+    if (p.x == 0 && q.x == 0) {
+      return p.y < q.y;
+    }
+    const auto a = p.y * q.x;
+    const auto b = q.y * p.x;
+    if (a == b) {
+      return p.x < q.x;
+    }
+    return a > b;
+  }
+  return lhs.first().location().smaller_than(rhs.first().location());
+}
 
 ////----
 // HELPER FUNCTIONS
@@ -123,19 +154,19 @@ public:
  * way as parameter. This takes into account that there might be
  * non-way members in the relation.
  */
-template <typename TFunc, typename Members>
-inline void for_each_member(const osm::Relation<Members>& relation,
-                            const std::vector<const osm::Way*>& ways,
-                            TFunc&& func) {
-  auto way_it = ways.cbegin();
-  for (const auto& member : relation.members()) {
-    if (member.type() == osmium::item_type::way) {
-      assert(way_it != ways.cend());
-      std::forward<TFunc>(func)(member, **way_it);
-      ++way_it;
-    }
-  }
-}
+// template <typename TFunc, typename Members>
+// inline void for_each_member(const osm::Relation<Members>& relation,
+//                             const std::vector<const osm::Way*>& ways,
+//                             TFunc&& func) {
+//   auto way_it = ways.cbegin();
+//   for (const auto& member : relation.members()) {
+//     if (member.type() == osm::member_type::kWay) {
+//       // assert(way_it != ways.cend());
+//       std::forward<TFunc>(func)(member, **way_it);
+//       ++way_it;
+//     }
+//   }
+// }
 
 inline bool outside_x_range(const NodeRefSegment& s1,
                             const NodeRefSegment& s2) noexcept {
@@ -190,22 +221,17 @@ inline osm::Location calculate_intersection(const NodeRefSegment& s1,
 
   const vec pd = p1 - p0;
   const std::int64_t d = pd * (q1 - q0);
-
   if (d != 0) {
     // segments are not collinear
-
     if (p0 == q0 || p0 == q1 || p1 == q0 || p1 == q1) {
       // touching at an end point
       return osm::Location{};
     }
-
     // intersection in a point
     const std::int64_t na =
         ((q1.x - q0.x) * (p0.y - q0.y)) - ((q1.y - q0.y) * (p0.x - q0.x));
-
     const std::int64_t nb =
         ((p1.x - p0.x) * (p0.y - q0.y)) - ((p1.y - p0.y) * (p0.x - q0.x));
-
     if ((d > 0 && na >= 0 && na <= d && nb >= 0 && nb <= d) ||
         (d < 0 && na <= 0 && na >= d && nb <= 0 && nb >= d)) {
       const double ua = static_cast<double>(na) / static_cast<double>(d);
@@ -213,34 +239,28 @@ inline osm::Location calculate_intersection(const NodeRefSegment& s1,
       return osm::Location{static_cast<int32_t>(i.x),
                            static_cast<int32_t>(i.y)};
     }
-
     return osm::Location{};
   }
 
   // segments are collinear
   if (pd * (q0 - p0) == 0) {
     // segments are on the same line
-
     struct seg_loc {
       int segment;
       osm::Location location;
     };
-
     std::array<seg_loc, 4UL> sl = {{
         {0, s1.first().location()},
         {0, s1.second().location()},
         {1, s2.first().location()},
         {1, s2.second().location()},
     }};
-
     std::sort(sl.begin(), sl.end(), [](const seg_loc& lhs, const seg_loc& rhs) {
       return lhs.location.smaller_than(rhs.location);
     });
-
     if (sl[1].location.equal_to(sl[2].location)) {
       return osm::Location{};
     }
-
     if (sl[0].segment != sl[1].segment) {
       if (sl[0].location.equal_to(sl[1].location)) {
         return sl[2].location;
@@ -248,12 +268,12 @@ inline osm::Location calculate_intersection(const NodeRefSegment& s1,
       return sl[1].location;
     }
   }
-
   return osm::Location{};
 }
 
 struct SegmentList {
   std::vector<NodeRefSegment> segments_;
+
   static role_type parse_role(const char* role) noexcept {
     if (role[0] == '\0') {
       return role_type::empty;
@@ -306,10 +326,8 @@ struct SegmentList {
                                                   nr.location());
         }
       }
-
       previous_nr = nr;
     }
-
     return invalid_locations;
   }
 
@@ -343,13 +361,10 @@ public:
   auto end() noexcept { return segments_.end(); }
   auto begin() const noexcept { return segments_.begin(); }
   auto end() const noexcept { return segments_.end(); }
-
-  /// Sort the list of segments.
   void sort() { std::sort(segments_.begin(), segments_.end()); }
 
   /**
    * Extract segments from given way and add them to the list.
-   *
    * Segments connecting two nodes with the same location (ie
    * same node or different nodes with same location) are
    * removed after reporting the duplicate node.
@@ -368,6 +383,7 @@ public:
   /**
    * Extract all segments from all ways that make up this
    * multipolygon relation and add them to the list.
+   * Umgeschrieben
    */
   template <typename Members>
   uint32_t extract_segments_from_ways(
@@ -375,34 +391,36 @@ public:
       uint64_t& duplicate_nodes,
       uint64_t& duplicate_ways,
       const osm::Relation<Members>& relation,
-      const std::vector<const osm::Way*>& members) {
-    // assert(relation.cmembers().size() >= members.size());
+      const std::vector<const osm::Way*>& ways) {
+    // assert(relation.cmembers().size() >= ways.size());
 
-    const std::size_t num_segments = get_num_segments(members);
+    const std::size_t num_segments = get_num_segments(ways);
     // if (problem_reporter) {
     //   problem_reporter->set_nodes(num_segments);
     // }
     segments_.reserve(num_segments);
 
     std::unordered_set<osm::object_id_type> ids;
-    ids.reserve(members.size());
+    ids.reserve(ways.size());
     uint32_t invalid_locations = 0;
-    for_each_member(
-        relation, members,
-        [&](const osmium::RelationMember& member, const osm::Way& way) {
-          if (ids.count(way.id) == 0) {
-            ids.insert(way.id);
-            const auto role = parse_role(member.role());
-            invalid_locations += extract_segments_from_way_impl(
-                problem_reporter, duplicate_nodes, way, role);
-          } else {
-            ++duplicate_ways;
-            if (problem_reporter) {
-              problem_reporter->report_duplicate_way(way);
-            }
+    auto way_it = ways.cbegin();
+    for (const auto& member : relation.members()) {
+      if (member.type == osm::member_type::kWay) {
+        // assert(way_it != ways.cend());
+        if (ids.count((*way_it)->id) == 0) {
+          ids.insert((*way_it)->id);
+          const auto role = parse_role(member.role);
+          invalid_locations += extract_segments_from_way_impl(
+              problem_reporter, duplicate_nodes, **way_it, role);
+        } else {
+          ++duplicate_ways;
+          if (problem_reporter) {
+            problem_reporter->report_duplicate_way(**way_it);
           }
-        });
-
+        }
+        ++way_it;
+      }
+    }
     return invalid_locations;
   }
 
@@ -420,7 +438,6 @@ public:
       if (it == segments_.end()) {
         break;
       }
-
       // Only count and report duplicate segments if they
       // belong to the same way or if they don't both have
       // the role "inner". Those cases are definitely wrong.
@@ -435,7 +452,6 @@ public:
           problem_reporter->report_duplicate_segment(it->first(), it->second());
         }
       }
-
       // if (it + 2 != segments_.end() && *it == *(it + 2)) {
       if (it + 2 != segments_.end() && it == (it + 2)) {
         ++overlapping_segments;
@@ -444,7 +460,6 @@ public:
                                                        it->second());
         }
       }
-
       segments_.erase(it, it + 2);
     }
   }
@@ -460,9 +475,7 @@ public:
     if (segments_.empty()) {
       return 0;
     }
-
     uint32_t found_intersections = 0;
-
     for (auto it1 = segments_.cbegin(); it1 != segments_.cend() - 1; ++it1) {
       const NodeRefSegment& s1 = *it1;
       for (auto it2 = it1 + 1; it2 != segments_.end(); ++it2) {
@@ -473,7 +486,6 @@ public:
         if (outside_x_range(s2, s1)) {
           break;
         }
-
         if (y_range_overlap(s1, s2)) {
           const osm::Location intersection{calculate_intersection(s1, s2)};
           if (intersection.is_there()) {
@@ -488,7 +500,6 @@ public:
         }
       }
     }
-
     return found_intersections;
   }
 

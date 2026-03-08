@@ -3,7 +3,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "osm/varint.h"
+
 namespace osm {
+
+enum member_type : std::uint32_t { kNode, kWay, kRelation };
 
 static const int undefined_coordinate = 2147483647;
 static const int coordinate_precision = 10000000;
@@ -59,17 +63,17 @@ struct Node {
 };
 
 struct NodeRef {
-  object_id_type id;
+  object_id_type ref_id;
   osm::Location loc;
-  constexpr object_id_type ref() const { return id; }
-  constexpr osm::Location location() const { return loc; }
+  constexpr object_id_type ref() const { return ref_id; }
+  const osm::Location& location() const noexcept { return loc; }
+  osm::Location& location() noexcept { return loc; }
   void set_location(osm::Location l) { loc = l; }
 };
 
 struct Way {
   object_id_type id;
   std::vector<NodeRef> node_refs;
-
   std::vector<NodeRef> nodes() const { return node_refs; }
   bool ends_have_same_id() const noexcept {
     // assert(!nodes().empty());
@@ -77,11 +81,12 @@ struct Way {
   }
 };
 
+// NICHT SICHER
 template <typename Members>
 struct Relation {
   object_id_type id;
-  Members mmembers;
-  constexpr Members members() const { return mmembers; }
+  Members members_;
+  constexpr Members members() const { return members_; }
 };
 
 }  // namespace osm
