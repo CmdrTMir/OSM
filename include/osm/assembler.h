@@ -140,7 +140,8 @@ struct assembly {
       for (const slocation& sl : locations) {
         const NodeRefSegment& segment = segment_list_[sl.item];
         if (!segment.is_done()) {
-          count_remaining -= add_new_ring(sl, debug);  // TODO
+          count_remaining -=
+              add_new_ring(sl, segment_list_, rings, locations, debug);
           if (count_remaining == 0) {
             return;
           }
@@ -158,7 +159,8 @@ struct assembly {
                   << " split locations -> using complex algorithm\n";
       }
       ++stats_.area_touching_rings_case;
-      if (!create_rings_complex_case()) {  // TODO
+      if (!create_rings_complex_case(segment_list_, rings, locations,
+                                     split_locations, debug)) {  // TODO
         return false;
       }
     }
