@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <iosfwd>
 
@@ -10,19 +12,14 @@ namespace assembler {
  * for most operations with inputs based on 32 bit locations.
  */
 struct vec {
-
   std::int64_t x;
   std::int64_t y;
-
   constexpr vec(std::int64_t a, std::int64_t b) noexcept : x(a), y(b) {}
-
   constexpr explicit vec(const osm::Location& l) noexcept
       : x(l.x()), y(l.y()) {}
-
   constexpr explicit vec(const osm::NodeRef& nr) noexcept
       : x(nr.location().x()), y(nr.location().y()) {}
-
-};  // struct vec
+};
 
 constexpr vec operator+(const vec& lhs, const vec& rhs) noexcept {
   return vec{lhs.x + rhs.x, lhs.y + rhs.y};

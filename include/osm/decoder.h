@@ -12,14 +12,13 @@
 #include "utl/zip.h"
 
 #include "osm/tags.h"
+#include "osm/types.h"
 #include "osm/varint.h"
 
 namespace osm {
 
 constexpr auto const kMaxStringLength = 256U * 4U;
 constexpr auto const kNanoDegree = 1'000'000'000.0;
-
-enum member_type : std::uint32_t { kNode, kWay, kRelation };
 
 struct meta_data {
   geo::latlng to_latlng(std::int64_t const lat, std::int64_t const lon) const {

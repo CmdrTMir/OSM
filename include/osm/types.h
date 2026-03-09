@@ -8,7 +8,6 @@
 namespace osm {
 
 enum member_type : std::uint32_t { kNode, kWay, kRelation };
-
 static const int undefined_coordinate = 2147483647;
 static const int coordinate_precision = 10000000;
 using object_id_type = std::int64_t;

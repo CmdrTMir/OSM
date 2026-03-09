@@ -66,7 +66,6 @@ struct id_offset {
   size_t offset_;
 };
 
-// ersetzte mmap durch cista::mmap?
 struct hybrid_node_idx::impl {
   impl(int idx_fd, int dat_fd) : idx_{idx_fd}, dat_{dat_fd} {}
 
@@ -294,31 +293,46 @@ void get_coords(hybrid_node_idx const& nodes,
   }
 }
 
-// hier ist noch ein Fehler
-void update_locations(hybrid_node_idx const& nodes,
-                      boost::asio::const_buffer& buffer) {
-  struct query_builder {
-    // void way(osm::Way& way) {
-    //   for (auto& node_ref : way.nodes()) {
-    //     query_.emplace_back(node_ref.ref(), &node_ref.location());
-    //   }
-    // }
-    std::vector<std::pair<osm_id_t, osm::Location*>> query_;
-  };
-
-  // TODO
-  query_builder builder;
-  // o::apply(buffer, builder);
-
-  if (!builder.query_.empty()) {
-    get_coords(nodes, builder.query_);
-
-    for (auto const& pair : builder.query_) {
+// FRAGE: was genau wird mit update_locations geupdated?
+// Was ist mit der way funktion weiter unten?
+// mein versuch
+void update_locations_of_way(hybrid_node_idx const& nodes, osm::Way& way) {
+  std::vector<std::pair<osm_id_t, osm::Location*>> query_;
+  for (auto& node_ref : way.nodes()) {
+    query_.emplace_back(node_ref.ref(), &node_ref.location());
+  }
+  if (!query_.empty()) {
+    get_coords(nodes, query_);
+    for (auto const& pair : query_) {
       pair.second->set_x(pair.second->x() - hybrid_node_idx::x_offset);
       pair.second->set_y(pair.second->y() - hybrid_node_idx::y_offset);
     }
   }
 }
+
+// void update_locations(hybrid_node_idx const& nodes,
+//                       boost::asio::const_buffer& buffer) {
+//   struct query_builder {
+//     void way(osm::Way& way) {
+//       for (auto& node_ref : way.nodes()) {
+//         query_.emplace_back(node_ref.ref(), &node_ref.location());
+//       }
+//     }
+//     std::vector<std::pair<osm_id_t, osm::Location*>> query_;
+//   };
+
+//   query_builder builder;
+//   // o::apply(buffer, builder);
+
+//   if (!builder.query_.empty()) {
+//     get_coords(nodes, builder.query_);
+
+//     for (auto const& pair : builder.query_) {
+//       pair.second->set_x(pair.second->x() - hybrid_node_idx::x_offset);
+//       pair.second->set_y(pair.second->y() - hybrid_node_idx::y_offset);
+//     }
+//   }
+// }
 
 hybrid_node_idx::hybrid_node_idx()
     : impl_{std::make_unique<impl>(ium::create_tmp_file(),
