@@ -67,7 +67,7 @@ struct NodeRefSegment {
   ProtoRing* ring() const noexcept { return ring_; }
   bool is_done() const noexcept { return ring_ != nullptr; }
   void set_ring(ProtoRing* ring) noexcept {
-    ////assert(ring);
+    assert(ring);
     ring_ = ring;
   }
 
@@ -254,7 +254,7 @@ struct ProtoRing {
   }
 
   void add_segment_back(NodeRefSegment* segment) {
-    ////assert(segment);
+    assert(segment);
     if (*segment < *min_segment_) {
       min_segment_ = segment;
     }
@@ -466,7 +466,7 @@ struct SegmentList {
       uint64_t& duplicate_ways,
       const osm::Relation<Members>& relation,
       const std::vector<const osm::Way*>& ways) {
-    // assert(relation.cmembers().size() >= ways.size());
+    assert(relation.members().size() >= ways.size());
 
     const std::size_t num_segments = get_num_segments(ways);
     // if (problem_reporter) {
@@ -480,7 +480,7 @@ struct SegmentList {
     auto way_it = ways.cbegin();
     for (const auto& member : relation.members()) {
       if (member.type == osm::member_type::kWay) {
-        // assert(way_it != ways.cend());
+        assert(way_it != ways.cend());
         if (ids.count((*way_it)->id) == 0) {
           ids.insert((*way_it)->id);
           const auto role = parse_role(member.role);
@@ -555,7 +555,7 @@ struct SegmentList {
       for (auto it2 = it1 + 1; it2 != segments_.end(); ++it2) {
         const NodeRefSegment& s2 = *it2;
         // erase_duplicate_segments() should have made sure of that
-        // assert(s1 != s2);
+        assert(s1 != s2);
 
         if (outside_x_range(s2, s1)) {
           break;

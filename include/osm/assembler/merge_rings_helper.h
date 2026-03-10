@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <iterator>
 #include <list>
 
@@ -22,12 +23,12 @@ NodeRefSegment* get_next_segment(const osm::Location& location) {
                rhs.location(state_.segment_list, location);
       });
 
-  ////assert(it != state_.slocations.end());
+  assert(it != state_.slocations.end());
   if (state_.segment_list[it->item].is_done()) {
     ++it;
   }
-  ////assert(it != locations.end());
-  ////assert(!segment_list[it->item].is_done());
+  assert(it != state_.locations.end());
+  assert(!state_.segment_list[it->item].is_done());
   return &state_.segment_list[it->item];
 }
 
@@ -386,7 +387,7 @@ void find_candidates(std::vector<candidate>& candidates,
  * returns false.
  */
 bool join_connected_rings(open_ring_its_type& open_ring_its) {
-  ////assert(!open_ring_its.empty());
+  assert(!open_ring_its.empty());
   if (state_.debug) {
     std::cerr << "    Trying to merge " << open_ring_its.size()
               << " open rings (join_connected_rings)\n";

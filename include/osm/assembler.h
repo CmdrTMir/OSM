@@ -79,7 +79,7 @@ struct assembly {
     // anything that makes sense here and even if there are
     // 2^32 segments here, it would simply not go through
     // all of them not building the multipolygon correctly.
-    /////assert(segment_list_.size() < std::numeric_limits<uint32_t>::max());
+    assert(state_.segment_list.size() < std::numeric_limits<uint32_t>::max());
     for (uint32_t n = 0; n < static_cast<uint32_t>(state_.segment_list.size());
          ++n) {
       locations.emplace_back(n, false);
@@ -146,7 +146,7 @@ struct assembly {
               return lhs.location(state_.segment_list, location) <
                      rhs.location(state_.segment_list, location);
             });
-        ////assert(it != m_locations.cend());
+        assert(it != locations.cend());
         const osm::object_id_type id = it->node_ref(state_.segment_list).ref();
         state_.problem_reporter.report_touching_ring(id, location);
         if (state_.debug) {
@@ -203,7 +203,7 @@ struct assembly {
     for (const ProtoRing& ring : rings) {
       for (const auto& segment : ring.segments()) {
         count_segments_for_debug++;
-        ////assert(segment->way());
+        assert(segment->way());
         if (!segment->role_empty() &&
             (ring.is_outer() ? !segment->role_outer()
                              : !segment->role_inner())) {
@@ -271,6 +271,8 @@ struct assembly {
      * sieht viel zu kompliziert für das hier aus
      * Also die rings müssen mit der add_rings_to_area funktion zur Area werden,
      * aber WIE?
+     *
+     * TODO: state init und check locations/rings etc in create_rings
      */
     const bool area_okay = create_rings();
     if (area_okay || state_.stats.create_empty_areas) {

@@ -51,18 +51,6 @@ struct Location {
   bool is_there() const {
     return x_ != undefined_coordinate && y_ != undefined_coordinate;
   }
-
-  bool equal_to(const Location& other_location) const {
-    return x_ == other_location.x() && y_ == other_location.y();
-  }
-  bool smaller_than(const Location& other_location) const {
-    return (x_ == other_location.x() && y_ < other_location.y()) ||
-           x_ < other_location.x();
-  }
-  bool greater_than(const Location& other_location) const {
-    return (other_location.x() == x_ && other_location.y() < y_) ||
-           other_location.x() < x_;
-  }
 };
 
 struct Node {
