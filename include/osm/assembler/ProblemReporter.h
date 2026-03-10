@@ -6,7 +6,7 @@
 
 namespace assembler {
 
-struct problem_reporter {
+struct ProblemReporter {
 
   void header(const char* msg) {
     *out_stream_ << "DATA PROBLEM: " << msg << " ON ";

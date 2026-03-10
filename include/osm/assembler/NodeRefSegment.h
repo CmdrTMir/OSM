@@ -10,7 +10,7 @@ namespace assembler {
 
 enum role_type : uint8_t { unknown = 0, outer = 1, inner = 2, empty = 3 };
 /**
- * This helper class for the Assembler class models a segment,
+ * This helper for the Assembler models a segment,
  * the connection between two nodes.
  *
  * Internally segments have their smaller coordinate at the

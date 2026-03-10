@@ -34,6 +34,24 @@ struct Location {
            x_ <= 180 * coordinate_precision &&
            y_ >= -90 * coordinate_precision && y_ <= 90 * coordinate_precision;
   }
+  inline bool operator==(const Location& other_location) const {
+    return x_ == other_location.x() && y_ == other_location.y();
+  }
+  inline bool operator!=(const Location& other_location) const {
+    return !(*this == other_location);
+  }
+  inline bool operator<(const Location& other_location) const {
+    return (x_ == other_location.x() && y_ < other_location.y()) ||
+           x_ < other_location.x();
+  }
+  inline bool operator>(const Location& other_location) const {
+    return (other_location.x() == x_ && other_location.y() < y_) ||
+           other_location.x() < x_;
+  }
+  bool is_there() const {
+    return x_ != undefined_coordinate && y_ != undefined_coordinate;
+  }
+
   bool equal_to(const Location& other_location) const {
     return x_ == other_location.x() && y_ == other_location.y();
   }
@@ -44,9 +62,6 @@ struct Location {
   bool greater_than(const Location& other_location) const {
     return (other_location.x() == x_ && other_location.y() < y_) ||
            other_location.x() < x_;
-  }
-  bool is_there() const {
-    return x_ != undefined_coordinate && y_ != undefined_coordinate;
   }
 };
 

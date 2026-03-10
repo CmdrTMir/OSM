@@ -13,8 +13,8 @@
 #include <vector>
 
 #include "NodeRefSegment.h"
+#include "ProblemReporter.h"
 #include "osm/types.h"
-#include "problem_reporter.h"
 #include "vec.h"
 
 namespace assembler {
@@ -176,7 +176,7 @@ struct SegmentList {
                            });
   }
 
-  uint32_t extract_segments_from_way_impl(problem_reporter* problem_reporter,
+  uint32_t extract_segments_from_way_impl(ProblemReporter* problem_reporter,
                                           uint64_t& duplicate_nodes,
                                           const osm::Way& way,
                                           role_type role) {
@@ -242,7 +242,7 @@ struct SegmentList {
    * same node or different nodes with same location) are
    * removed after reporting the duplicate node.
    */
-  uint32_t extract_segments_from_way(problem_reporter* problem_reporter,
+  uint32_t extract_segments_from_way(ProblemReporter* problem_reporter,
                                      uint64_t& duplicate_nodes,
                                      const osm::Way& way) {
     if (way.nodes().empty()) {
@@ -260,7 +260,7 @@ struct SegmentList {
    */
   template <typename Members>
   uint32_t extract_segments_from_ways(
-      problem_reporter* problem_reporter,
+      ProblemReporter* problem_reporter,
       uint64_t& duplicate_nodes,
       uint64_t& duplicate_ways,
       const osm::Relation<Members>& relation,
@@ -303,7 +303,7 @@ struct SegmentList {
    * same segment. So if there are three, for instance, two will
    * be removed and one will be left.
    */
-  void erase_duplicate_segments(problem_reporter* problem_reporter,
+  void erase_duplicate_segments(ProblemReporter* problem_reporter,
                                 uint64_t& duplicate_segments,
                                 uint64_t& overlapping_segments) {
     while (true) {
@@ -344,7 +344,7 @@ struct SegmentList {
    *                         reported to this object.
    * @returns true if there are intersections.
    */
-  uint32_t find_intersections(problem_reporter* problem_reporter) const {
+  uint32_t find_intersections(ProblemReporter* problem_reporter) const {
     if (segments_.empty()) {
       return 0;
     }

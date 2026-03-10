@@ -2,9 +2,8 @@
 
 #include "assembler/ProtoRing.h"
 #include "assembler/assemble_rings.h"
-#include "assembler/assembler_stats.h"
-#include "assembler/problem_reporter.h"
 #include "assembler/segment_list.h"
+#include "assembler/state.h"
 
 #include <cassert>
 #include <iostream>
@@ -14,21 +13,21 @@
 namespace assembler {
 struct assembly {
 
-  bool create_rings(bool debug) {
-    stats_.nodes += segment_list_.size();
+  bool create_rings() {
+    state_.stats.nodes += state_.segment_list.size();
     // Sort the list of segments (from left to right and bottom
     // to top).
-    segment_list_.sort();
+    state_.segment_list.sort();
     // Remove duplicate segments. Removal is in pairs, so if there
     // are two identical segments, they will both be removed. If
     // there are three, two will be removed and one remains.
-    segment_list_.erase_duplicate_segments(&problem_reporter_,
-                                           stats_.duplicate_segments,
-                                           stats_.overlapping_segments);
+    state_.segment_list.erase_duplicate_segments(
+        &state_.problem_reporter, state_.stats.duplicate_segments,
+        state_.stats.overlapping_segments);
     // If there are no segments left at this point, this isn't
     // a valid area.
-    if (segment_list_.empty()) {
-      if (debug) {
+    if (state_.segment_list.empty()) {
+      if (state_.debug) {
         std::cerr << "  No segments left\n";
       }
       return false;
@@ -37,8 +36,9 @@ struct assembly {
     // any, the multipolygon is invalid.
     // In the future this could be improved by trying to fix those
     // cases.
-    stats_.intersections = segment_list_.find_intersections(&problem_reporter_);
-    if (stats_.intersections) {
+    state_.stats.intersections =
+        state_.segment_list.find_intersections(&state_.problem_reporter);
+    if (state_.stats.intersections) {
       return false;
     }
     // locations: An ordered list of locations of both endpoints
@@ -46,20 +46,21 @@ struct assembly {
     // use this list later to quickly find which segment(s) fits
     // onto a known segment.
     std::vector<slocation> locations;
-    locations.reserve(segment_list_.size() * 2);
+    locations.reserve(state_.segment_list.size() * 2);
     // static_cast is okay here: The 32bit limit is way past
     // anything that makes sense here and even if there are
     // 2^32 segments here, it would simply not go through
     // all of them not building the multipolygon correctly.
     /////assert(segment_list_.size() < std::numeric_limits<uint32_t>::max());
-    for (uint32_t n = 0; n < static_cast<uint32_t>(segment_list_.size()); ++n) {
+    for (uint32_t n = 0; n < static_cast<uint32_t>(state_.segment_list.size());
+         ++n) {
       locations.emplace_back(n, false);
       locations.emplace_back(n, true);
     }
     std::stable_sort(locations.begin(), locations.end(),
                      [this](const slocation& lhs, const slocation& rhs) {
-                       return lhs.location(segment_list_)
-                           .smaller_than(rhs.location(segment_list_));
+                       return lhs.location(state_.segment_list)
+                           .smaller_than(rhs.location(state_.segment_list));
                      });
     // Find all locations where more than two segments start or
     // end. We call those "split" locations. If there are any
@@ -70,24 +71,24 @@ struct assembly {
      * and the function returns false.
      */
     bool found_split_locations = false;  // richtig initialisiert?
-    std::vector<osm::Location> split_locations;
+    // std::vector<osm::Location> split_locations;
     osm::Location previous_location;
     for (auto it = locations.cbegin(); it != locations.cend(); ++it) {
-      const osm::NodeRef& nr = it->node_ref(segment_list_);
+      const osm::NodeRef& nr = it->node_ref(state_.segment_list);
       const osm::Location& loc = nr.location();
       if (std::next(it) == locations.cend() ||
-          !loc.equal_to(std::next(it)->location(segment_list_))) {
-        if (debug) {
+          !loc.equal_to(std::next(it)->location(state_.segment_list))) {
+        if (state_.debug) {
           std::cerr << " Found open ring at " << nr.ref() << "\n";
         }
-        const auto& segment = segment_list_[it->item];
-        problem_reporter_.report_ring_not_closed(nr, segment.way());
-        ++stats_.open_rings;
+        const auto& segment = state_.segment_list[it->item];
+        state_.problem_reporter.report_ring_not_closed(nr, segment.way());
+        ++state_.stats.open_rings;
       } else {
         if (loc.equal_to(previous_location) &&
-            (split_locations.empty() ||
-             !split_locations.back().equal_to(previous_location))) {
-          split_locations.push_back(previous_location);
+            (state_.split_locations.empty() ||
+             !state_.split_locations.back().equal_to(previous_location))) {
+          state_.split_locations.push_back(previous_location);
         }
         ++it;
         if (it == locations.end()) {
@@ -96,7 +97,7 @@ struct assembly {
       }
       previous_location = loc;
     }
-    found_split_locations = stats_.open_rings == 0;
+    found_split_locations = state_.stats.open_rings == 0;
     //?????
     // if (!find_split_locations()) {
     //   return false;
@@ -105,22 +106,22 @@ struct assembly {
       return false;
     }
     // Now report all split locations to the problem reporter.
-    stats_.touching_rings += split_locations.size();
-    if (!split_locations.empty()) {
-      if (debug) {
+    state_.stats.touching_rings += state_.split_locations.size();
+    if (!state_.split_locations.empty()) {
+      if (state_.debug) {
         std::cerr << "  Found split locations:\n";
       }
-      for (const auto& location : split_locations) {
+      for (const auto& location : state_.split_locations) {
         auto it = std::lower_bound(
             locations.cbegin(), locations.cend(), slocation{},
             [this, &location](const slocation& lhs, const slocation& rhs) {
-              return lhs.location(segment_list_, location)
-                  .smaller_than(rhs.location(segment_list_, location));
+              return lhs.location(state_.segment_list, location)
+                  .smaller_than(rhs.location(state_.segment_list, location));
             });
         ////assert(it != m_locations.cend());
-        const osm::object_id_type id = it->node_ref(segment_list_).ref();
-        problem_reporter_.report_touching_ring(id, location);
-        if (debug) {
+        const osm::object_id_type id = it->node_ref(state_.segment_list).ref();
+        state_.problem_reporter.report_touching_ring(id, location);
+        if (state_.debug) {
           std::cerr << "    " << location.x() << "," << location.y() << "\n";
         }
       }
@@ -129,45 +130,43 @@ struct assembly {
     // whether there were any split locations or not. If there
     // are no splits, we use the faster "simple algorithm", if
     // there are, we use the slower "complex algorithm".
-    std::list<ProtoRing> rings;
-    if (split_locations.empty()) {
-      if (debug) {
+    std::list<ProtoRing> rings;  // TODO
+    if (state_.split_locations.empty()) {
+      if (state_.debug) {
         std::cerr << " No split locations -> using simple algorithm\n";
       }
-      ++stats_.area_simple_case;
+      ++state_.stats.area_simple_case;
       // create_rings_simple_case:
-      auto count_remaining = segment_list_.size();
+      auto count_remaining = state_.segment_list.size();
       for (const slocation& sl : locations) {
-        const NodeRefSegment& segment = segment_list_[sl.item];
+        const NodeRefSegment& segment = state_.segment_list[sl.item];
         if (!segment.is_done()) {
-          count_remaining -=
-              add_new_ring(sl, segment_list_, rings, locations, debug);
+          count_remaining -= add_new_ring(sl);
           if (count_remaining == 0) {
             return;
           }
         }
       }
-    } else if (split_locations.size() > max_split_locations_) {
-      if (debug) {
-        std::cerr << " Ignoring polygon with " << split_locations.size()
+    } else if (state_.split_locations.size() > max_split_locations_) {
+      if (state_.debug) {
+        std::cerr << " Ignoring polygon with " << state_.split_locations.size()
                   << " split locations (>" << max_split_locations_ << ")\n";
       }
       return false;
     } else {
-      if (debug) {
-        std::cerr << " Found " << split_locations.size()
+      if (state_.debug) {
+        std::cerr << " Found " << state_.split_locations.size()
                   << " split locations -> using complex algorithm\n";
       }
-      ++stats_.area_touching_rings_case;
-      if (!create_rings_complex_case(segment_list_, rings, locations,
-                                     split_locations, debug)) {  // TODO
+      ++state_.stats.area_touching_rings_case;
+      if (!create_rings_complex_case()) {  // TODO
         return false;
       }
     }
     // If the assembler was so configured, now check whether the
     // member roles are correctly tagged. --> check always
     // check_inner_outer_roles:
-    if (debug) {
+    if (state_.debug) {
       std::cerr << "    Checking inner/outer roles\n";
     }
     int count_segments_for_debug = 0;
@@ -180,19 +179,19 @@ struct assembly {
         if (!segment->role_empty() &&
             (ring.is_outer() ? !segment->role_outer()
                              : !segment->role_inner())) {
-          ++stats_.wrong_role;
-          if (debug) {
+          ++state_.stats.wrong_role;
+          if (state_.debug) {
             std::cerr << " Segment: " << count_segments_for_debug
                       << " from way " << segment->way()->id << " has role '"
                       << segment->role_name() << "', but should have role '"
                       << (ring.is_outer() ? "outer" : "inner") << "'\n ";
           }
           if (ring.is_outer()) {
-            problem_reporter_.report_role_should_be_outer(
+            state_.problem_reporter.report_role_should_be_outer(
                 segment->way()->id, segment->first().location(),
                 segment->second().location());
           } else {
-            problem_reporter_.report_role_should_be_inner(
+            state_.problem_reporter.report_role_should_be_inner(
                 segment->way()->id, segment->first().location(),
                 segment->second().location());
           }
@@ -209,18 +208,18 @@ struct assembly {
     for (const osm::Way* way :
          ways_in_multiple_rings) {  // NOLINT(bugprone - nondeterministic -
                                     // pointer - iteration - order)
-      ++stats_.ways_in_multiple_rings;
-      if (debug) {
+      ++state_.stats.ways_in_multiple_rings;
+      if (state_.debug) {
         std::cerr << " Way " << way->id << " is in multiple rings\n ";
       }
-      problem_reporter_.report_way_in_multiple_rings(*way);
+      state_.problem_reporter.report_way_in_multiple_rings(*way);
     }
     // check_inner_outer_roles - finished
 
-    stats_.outer_rings =
+    state_.stats.outer_rings =
         std::count_if(rings.cbegin(), rings.cend(),
                       [](const ProtoRing& ring) { return ring.is_outer(); });
-    stats_.inner_rings = rings.size() - stats_.outer_rings;
+    state_.stats.inner_rings = rings.size() - state_.stats.outer_rings;
     return true;
   }
 
@@ -234,20 +233,18 @@ struct assembly {
    * and their members.
    */
   // HIER STEHEN GEBLIEBEN
-  bool create_area_from_way(std::vector<int>& out_buffer,
-                            const osm::Way& way,
-                            bool debug) {
-    osm::AreaBuilder builder{out_buffer};
-    builder.initialize_from_object(way);
+  bool create_area_from_way(std::vector<int>& out_buffer, const osm::Way& way) {
+    // osm::AreaBuilder builder{out_buffer};
+    // builder.initialize_from_object(way);
 
-    const bool area_okay = create_rings(debug);
-    if (area_okay || stats_.create_empty_areas) {
-      builder.add_item(way.tags());
+    const bool area_okay = create_rings();
+    if (area_okay || state_.stats.create_empty_areas) {
+      // builder.add_item(way.tags());
     }
     if (area_okay) {
-      add_rings_to_area(builder);
+      // add_rings_to_area(builder);
     }
-    return area_okay || stats_.create_empty_areas;
+    return area_okay || state_.stats.create_empty_areas;
   }
 
   //   bool create_area_from_relation(
@@ -288,41 +285,41 @@ struct assembly {
    */
   bool assembling_area_from_way(const osm::Way& way,
                                 std::vector<int>& out_buffer,
-                                bool report_problems = true,
-                                bool debug) {
-    if (!stats_.create_way_polygons) {
+                                bool report_problems = true) {
+    if (!state_.stats.create_way_polygons) {
       return true;
     }
     // Ignore (but count) ways without segments.
     if (way.nodes().size() < 2) {
-      ++stats_.short_ways;
+      ++state_.stats.short_ways;
       return false;
     }
 
     if (!way.ends_have_same_id()) {
-      ++stats_.duplicate_nodes;
+      ++state_.stats.duplicate_nodes;
       if (report_problems) {
-        problem_reporter_.report_duplicate_node(way.nodes().front().ref(),
-                                                way.nodes().back().ref(),
-                                                way.nodes().front().location());
+        state_.problem_reporter.report_duplicate_node(
+            way.nodes().front().ref(), way.nodes().back().ref(),
+            way.nodes().front().location());
       }
     }
 
-    ++stats_.from_ways;
-    stats_.invalid_locations = segment_list_.extract_segments_from_way(
-        &problem_reporter_, stats_.duplicate_nodes, way);
+    ++state_.stats.from_ways;
+    state_.stats.invalid_locations =
+        state_.segment_list.extract_segments_from_way(
+            &state_.problem_reporter, state_.stats.duplicate_nodes, way);
     // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
-    if (stats_.invalid_locations > 0) {
+    if (state_.stats.invalid_locations > 0) {
       return false;
     }
-    if (debug) {
+    if (state_.debug) {
       std::cerr << "\nAssembling way " << way.id << " containing "
-                << segment_list_.size() << " nodes\n";
+                << state_.segment_list.size() << " nodes\n";
     }
-    const bool okay = create_area_from_way(out_buffer, way, debug);
-    if (debug) {
+    const bool okay = create_area_from_way(out_buffer, way);
+    if (state_.debug) {
       std::cerr << "Done: " << std::endl;
-      stats_.print_stats();
+      state_.stats.print_stats();
     }
     return okay;
   }
@@ -338,8 +335,7 @@ struct assembly {
   bool assembling_area_from_relation(const osm::Relation<Members>& relation,
                                      const std::vector<const osm::Way*>& ways,
                                      std::vector<int>& out_buffer,
-                                     bool report_problems = true,
-                                     bool debug) {
+                                     bool report_problems = true) {
     // if (!config().create_new_style_polygons) {
     //   return true;
     // }
@@ -352,27 +348,28 @@ struct assembly {
     // }
 
     if (relation.members().empty()) {
-      ++stats_.no_way_in_mp_relation;
+      ++state_.stats.no_way_in_mp_relation;
       return false;
     }
-    ++stats_.from_relations;
-    stats_.invalid_locations = segment_list_.extract_segments_from_ways(
-        &problem_reporter_, stats_.duplicate_nodes, stats_.duplicate_ways,
-        relation, ways);
+    ++state_.stats.from_relations;
+    state_.stats.invalid_locations =
+        state_.segment_list.extract_segments_from_ways(
+            &state_.problem_reporter, state_.stats.duplicate_nodes,
+            state_.stats.duplicate_ways, relation, ways);
     // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
-    if (stats_.invalid_locations > 0) {
+    if (state_.stats.invalid_locations > 0) {
       return false;
     }
-    stats_.member_ways = ways.size();
+    state_.stats.member_ways = ways.size();
 
-    if (stats_.member_ways == 1) {
-      ++stats_.single_way_in_mp_relation;
+    if (state_.stats.member_ways == 1) {
+      ++state_.stats.single_way_in_mp_relation;
     }
 
-    if (debug) {
+    if (state_.debug) {
       std::cerr << "\nAssembling relation " << relation.id() << "containing "
-                << ways.size() << " way members with " << segment_list_.size()
-                << " nodes\n";
+                << ways.size() << " way members with "
+                << state_.segment_list.size() << " nodes\n";
     }
     const bool okay = create_area_from_relation(out_buffer, relation, ways);
     // if (okay) {
@@ -383,10 +380,6 @@ struct assembly {
     return okay;
   }
 
-  SegmentList segment_list_ = SegmentList{};  // init?
-  area_stats stats_ = area_stats{};
-  problem_reporter problem_reporter_ = problem_reporter{};
-  static constexpr const std::size_t max_split_locations_ = 100ULL;
 };  // class Assembly
 
 }  // namespace assembler
