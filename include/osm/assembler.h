@@ -1,13 +1,14 @@
 #pragma once
 
-#include "assembler/ProtoRing.h"
 #include "assembler/assemble_rings.h"
-#include "assembler/segment_list.h"
+#include "assembler/assembler_types.h"
 #include "assembler/state.h"
 
 #include <cassert>
 #include <iostream>
 #include <list>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace assembler {
@@ -143,10 +144,10 @@ struct assembly {
         if (!segment.is_done()) {
           count_remaining -= add_new_ring(sl);
           if (count_remaining == 0) {
-            return;
+            break;
           }
         }
-      }
+      }  // create_rings_simple_case - finished
     } else if (state_.split_locations.size() > max_split_locations_) {
       if (state_.debug) {
         std::cerr << " Ignoring polygon with " << state_.split_locations.size()

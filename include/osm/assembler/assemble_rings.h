@@ -2,9 +2,9 @@
 
 #include <list>
 
+#include "assembler_types.h"
 #include "merge_rings_helper.h"
 #include "osm/types.h"
-#include "segment_list.h"
 #include "state.h"
 
 // TODO:

@@ -3,10 +3,8 @@
 #include <list>
 
 #include "ProblemReporter.h"
-#include "ProtoRing.h"
 #include "assembler_stats.h"
 #include "assembler_types.h"
-#include "segment_list.h"
 
 namespace assembler {
 constexpr std::size_t max_split_locations_ = 100ULL;

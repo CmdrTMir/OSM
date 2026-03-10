@@ -3,11 +3,10 @@
 #include <iterator>
 #include <list>
 
-#include "ProtoRing.h"
 #include "assembler_types.h"
 #include "iter.h"
 #include "osm/types.h"
-#include "segment_list.h"
+#include "state.h"
 
 namespace assembler {
 //
@@ -122,6 +121,121 @@ bool try_to_merge(open_ring_its_type& open_ring_its) {
     }
   }
   return false;
+}
+
+ProtoRing* find_enclosing_ring(NodeRefSegment* segment) {
+  if (state_.debug) {
+    std::cerr << "    Looking for ring enclosing \n";
+  }
+
+  const auto location = segment->first().location();
+  const auto end_location = segment->second().location();
+
+  while (segment->first().location().equal_to(location)) {
+    if (segment == &state_.segment_list.back()) {
+      break;
+    }
+    ++segment;
+  }
+
+  int nesting = 0;
+  std::vector<rings_stack_element> outer_rings;
+  while (segment >= &state_.segment_list.front()) {
+    if (!segment->is_direction_done()) {
+      --segment;
+      continue;
+    }
+    if (state_.debug) {
+      std::cerr << "      Checking against " << segment << "\n";
+    }
+    const osm::Location& a = segment->first().location();
+    const osm::Location& b = segment->second().location();
+
+    if (segment->first().location().equal_to(location)) {
+      const std::int64_t ax = a.x();
+      const std::int64_t bx = b.x();
+      const std::int64_t lx = end_location.x();
+      const std::int64_t ay = a.y();
+      const std::int64_t by = b.y();
+      const std::int64_t ly = end_location.y();
+      const auto z = ((bx - ax) * (ly - ay)) - ((by - ay) * (lx - ax));
+      if (state_.debug) {
+        std::cerr << "      Segment z=" << z << '\n';
+      }
+      if (z > 0) {
+        nesting += segment->is_reverse() ? -1 : 1;
+        if (state_.debug) {
+          std::cerr << "        Segment is below (nesting=" << nesting << ")\n";
+        }
+        if (segment->ring()->is_outer()) {
+          if (state_.debug) {
+            std::cerr << "        Segment belongs to outer ring (y=" << a.y()
+                      << " ring=" << segment->ring() << ")\n";
+          }
+          outer_rings.emplace_back(a.y(), segment->ring());
+        }
+      }
+    } else if (a.x() <= location.x() && location.x() < b.x()) {
+      if (state_.debug) {
+        std::cerr << "        Is in x range\n";
+      }
+
+      const std::int64_t ax = a.x();
+      const std::int64_t bx = b.x();
+      const std::int64_t lx = location.x();
+      const std::int64_t ay = a.y();
+      const std::int64_t by = b.y();
+      const std::int64_t ly = location.y();
+      const auto z = ((bx - ax) * (ly - ay)) - ((by - ay) * (lx - ax));
+
+      if (z >= 0) {
+        nesting += segment->is_reverse() ? -1 : 1;
+        if (state_.debug) {
+          std::cerr << "        Segment is below (nesting=" << nesting << ")\n";
+        }
+        if (segment->ring()->is_outer()) {
+          const double y = static_cast<double>(ay) +
+                           (static_cast<double>((by - ay) * (lx - ax)) /
+                            static_cast<double>(bx - ax));
+          if (state_.debug) {
+            std::cerr << "        Segment belongs to outer ring (y=" << y
+                      << " ring=" << segment->ring() << ")\n";
+          }
+          outer_rings.emplace_back(y, segment->ring());
+        }
+      }
+    }
+    --segment;
+  }
+
+  if (nesting % 2 == 0) {
+    if (state_.debug) {
+      std::cerr << "    Decided that this is an outer ring\n";
+    }
+    return nullptr;
+  }
+  if (state_.debug) {
+    std::cerr << "    Decided that this is an inner ring\n";
+  }
+  assert(!outer_rings.empty());
+  std::stable_sort(outer_rings.rbegin(), outer_rings.rend());
+  if (state_.debug) {
+    for (const auto& o : outer_rings) {
+      std::cerr << "        y=" << o.y()
+                << std::endl;  // " " << o.ring() << "\n";
+    }
+  }
+  remove_duplicates(outer_rings);
+  if (state_.debug) {
+    std::cerr << "      after remove duplicates:\n";
+    for (const auto& o : outer_rings) {
+      std::cerr << "        y=" << o.y()
+                << std::endl;  //" " << o.ring() << "\n";
+    }
+  }
+
+  assert(!outer_rings.empty());
+  return outer_rings.front().ring_ptr();
 }
 
 void find_inner_outer_complex(ProtoRing* ring) {
@@ -262,121 +376,6 @@ void find_candidates(std::vector<candidate>& candidates,
   }
 }
 // END: HELPER FUNCTIONS
-
-ProtoRing* find_enclosing_ring(NodeRefSegment* segment) {
-  if (state_.debug) {
-    std::cerr << "    Looking for ring enclosing \n";
-  }
-
-  const auto location = segment->first().location();
-  const auto end_location = segment->second().location();
-
-  while (segment->first().location().equal_to(location)) {
-    if (segment == &state_.segment_list.back()) {
-      break;
-    }
-    ++segment;
-  }
-
-  int nesting = 0;
-  std::vector<rings_stack_element> outer_rings;
-  while (segment >= &state_.segment_list.front()) {
-    if (!segment->is_direction_done()) {
-      --segment;
-      continue;
-    }
-    if (state_.debug) {
-      std::cerr << "      Checking against " << segment << "\n";
-    }
-    const osm::Location& a = segment->first().location();
-    const osm::Location& b = segment->second().location();
-
-    if (segment->first().location().equal_to(location)) {
-      const std::int64_t ax = a.x();
-      const std::int64_t bx = b.x();
-      const std::int64_t lx = end_location.x();
-      const std::int64_t ay = a.y();
-      const std::int64_t by = b.y();
-      const std::int64_t ly = end_location.y();
-      const auto z = ((bx - ax) * (ly - ay)) - ((by - ay) * (lx - ax));
-      if (state_.debug) {
-        std::cerr << "      Segment z=" << z << '\n';
-      }
-      if (z > 0) {
-        nesting += segment->is_reverse() ? -1 : 1;
-        if (state_.debug) {
-          std::cerr << "        Segment is below (nesting=" << nesting << ")\n";
-        }
-        if (segment->ring()->is_outer()) {
-          if (state_.debug) {
-            std::cerr << "        Segment belongs to outer ring (y=" << a.y()
-                      << " ring=" << segment->ring() << ")\n";
-          }
-          outer_rings.emplace_back(a.y(), segment->ring());
-        }
-      }
-    } else if (a.x() <= location.x() && location.x() < b.x()) {
-      if (state_.debug) {
-        std::cerr << "        Is in x range\n";
-      }
-
-      const std::int64_t ax = a.x();
-      const std::int64_t bx = b.x();
-      const std::int64_t lx = location.x();
-      const std::int64_t ay = a.y();
-      const std::int64_t by = b.y();
-      const std::int64_t ly = location.y();
-      const auto z = ((bx - ax) * (ly - ay)) - ((by - ay) * (lx - ax));
-
-      if (z >= 0) {
-        nesting += segment->is_reverse() ? -1 : 1;
-        if (state_.debug) {
-          std::cerr << "        Segment is below (nesting=" << nesting << ")\n";
-        }
-        if (segment->ring()->is_outer()) {
-          const double y = static_cast<double>(ay) +
-                           (static_cast<double>((by - ay) * (lx - ax)) /
-                            static_cast<double>(bx - ax));
-          if (state_.debug) {
-            std::cerr << "        Segment belongs to outer ring (y=" << y
-                      << " ring=" << segment->ring() << ")\n";
-          }
-          outer_rings.emplace_back(y, segment->ring());
-        }
-      }
-    }
-    --segment;
-  }
-
-  if (nesting % 2 == 0) {
-    if (state_.debug) {
-      std::cerr << "    Decided that this is an outer ring\n";
-    }
-    return nullptr;
-  }
-  if (state_.debug) {
-    std::cerr << "    Decided that this is an inner ring\n";
-  }
-  assert(!outer_rings.empty());
-  std::stable_sort(outer_rings.rbegin(), outer_rings.rend());
-  if (state_.debug) {
-    for (const auto& o : outer_rings) {
-      std::cerr << "        y=" << o.y()
-                << std::endl;  // " " << o.ring() << "\n";
-    }
-  }
-  remove_duplicates(outer_rings);
-  if (state_.debug) {
-    std::cerr << "      after remove duplicates:\n";
-    for (const auto& o : outer_rings) {
-      std::cerr << "        y=" << o.y()
-                << std::endl;  //" " << o.ring() << "\n";
-    }
-  }
-
-  assert(!outer_rings.empty());
-  return outer_rings.front().ring_ptr();
-}
 
 /**
  * If there are multiple open rings and multiple ways to join them,
