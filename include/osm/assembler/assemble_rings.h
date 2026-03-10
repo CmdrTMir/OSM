@@ -7,9 +7,6 @@
 #include "osm/types.h"
 #include "state.h"
 
-// TODO:
-//          2. output
-
 namespace assembler {
 
 uint32_t add_new_ring_complex(const slocation& node) {
@@ -93,11 +90,11 @@ std::uint32_t add_new_ring(const slocation& node) {
   osm::Location last_location = segment->stop().location();
 
   uint32_t nodes = 1;
-  while (!first_location.equal_to(last_location)) {
+  while (first_location != last_location) {
     ++nodes;
     NodeRefSegment* next_segment = get_next_segment(last_location);
     next_segment->mark_direction_done();
-    if (!next_segment->start().location().equal_to(last_location)) {
+    if (next_segment->start().location() != last_location) {
       next_segment->reverse();
     }
     ring->add_segment_back(next_segment);
@@ -124,8 +121,8 @@ bool create_rings_complex_case() {
     const auto locs = make_range(std::equal_range(
         state_.slocations.begin(), state_.slocations.end(), slocation{},
         [&location](const slocation& lhs, const slocation& rhs) {
-          return lhs.location(state_.segment_list, location)
-              .smaller_than(rhs.location(state_.segment_list, location));
+          return lhs.location(state_.segment_list, location) <
+                 rhs.location(state_.segment_list, location);
         }));
     for (auto& loc : locs) {
       if (!state_.segment_list[loc.item].is_done()) {

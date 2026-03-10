@@ -120,7 +120,7 @@ struct NodeRefSegment {
    * segment comes first.
    */
   bool operator<(const NodeRefSegment& other) const noexcept {
-    if (first_noderef_.location().equal_to(other.first().location())) {
+    if (first_noderef_.location() == other.first().location()) {
       const vec p0{first_noderef_.location()};
       const vec p1{second_noderef_.location()};
       const vec q0{other.first().location()};
@@ -227,13 +227,13 @@ inline osm::Location calculate_intersection(const NodeRefSegment& s1,
         {1, s2.second().location()},
     }};
     std::sort(sl.begin(), sl.end(), [](const seg_loc& lhs, const seg_loc& rhs) {
-      return lhs.location.smaller_than(rhs.location);
+      return lhs.location < rhs.location;
     });
-    if (sl[1].location.equal_to(sl[2].location)) {
+    if (sl[1].location == sl[2].location) {
       return osm::Location{};
     }
     if (sl[0].segment != sl[1].segment) {
-      if (sl[0].location.equal_to(sl[1].location)) {
+      if (sl[0].location == sl[1].location) {
         return sl[2].location;
       }
       return sl[1].location;
@@ -292,8 +292,7 @@ struct ProtoRing {
   }
 
   bool closed() const noexcept {
-    return get_node_ref_start().location().equal_to(
-        get_node_ref_stop().location());
+    return get_node_ref_start().location() == get_node_ref_stop().location();
   }
 
   void reverse() {
@@ -393,7 +392,7 @@ struct SegmentList {
         }
         continue;
       }
-      if (previous_nr.location().equal_to(nr.location())) {
+      if (previous_nr.location() == nr.location()) {
         segments_.emplace_back(previous_nr, nr, role, &way);
       } else {
         ++duplicate_nodes;

@@ -18,8 +18,8 @@ NodeRefSegment* get_next_segment(const osm::Location& location) {
   auto it = std::lower_bound(
       state_.slocations.begin(), state_.slocations.end(), slocation{},
       [&location](const slocation& lhs, const slocation& rhs) {
-        return lhs.location(state_.segment_list, location)
-            .smaller_than(rhs.location(state_.segment_list, location));
+        return lhs.location(state_.segment_list, location) <
+               rhs.location(state_.segment_list, location);
       });
 
   ////assert(it != state_.slocations.end());
@@ -131,7 +131,7 @@ ProtoRing* find_enclosing_ring(NodeRefSegment* segment) {
   const auto location = segment->first().location();
   const auto end_location = segment->second().location();
 
-  while (segment->first().location().equal_to(location)) {
+  while (segment->first().location() == location) {
     if (segment == &state_.segment_list.back()) {
       break;
     }
@@ -151,7 +151,7 @@ ProtoRing* find_enclosing_ring(NodeRefSegment* segment) {
     const osm::Location& a = segment->first().location();
     const osm::Location& b = segment->second().location();
 
-    if (segment->first().location().equal_to(location)) {
+    if (segment->first().location() == location) {
       const std::int64_t ax = a.x();
       const std::int64_t bx = b.x();
       const std::int64_t lx = end_location.x();

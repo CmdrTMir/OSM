@@ -14,6 +14,33 @@
 namespace assembler {
 struct assembly {
 
+  // template <typename TBuilder>
+  // static void build_ring_from_proto_ring(osmium::builder::AreaBuilder&
+  // builder,
+  //                                        const ProtoRing& ring) {
+  //   TBuilder ring_builder{builder};
+  //   ring_builder.add_node_ref(ring.get_node_ref_start());
+  //   for (const auto& segment : ring.segments()) {
+  //     ring_builder.add_node_ref(segment->stop());
+  //   }
+  // }
+  // /**
+  //  * Append each outer ring together with its inner rings to the
+  //  * area in the buffer.
+  //  */
+  // void add_rings_to_area(osmium::builder::AreaBuilder& builder) const {
+  //   for (const ProtoRing& ring : m_rings) {
+  //     if (ring.is_outer()) {
+  //       build_ring_from_proto_ring<osmium::builder::OuterRingBuilder>(builder,
+  //                                                                     ring);
+  //       for (const ProtoRing* inner : ring.inner_rings()) {
+  //         build_ring_from_proto_ring<osmium::builder::InnerRingBuilder>(builder,
+  //                                                                       *inner);
+  //       }
+  //     }
+  //   }
+  // }
+
   bool create_rings() {
     state_.stats.nodes += state_.segment_list.size();
     // Sort the list of segments (from left to right and bottom
@@ -60,8 +87,8 @@ struct assembly {
     }
     std::stable_sort(locations.begin(), locations.end(),
                      [this](const slocation& lhs, const slocation& rhs) {
-                       return lhs.location(state_.segment_list)
-                           .smaller_than(rhs.location(state_.segment_list));
+                       return lhs.location(state_.segment_list) <
+                              rhs.location(state_.segment_list);
                      });
     // Find all locations where more than two segments start or
     // end. We call those "split" locations. If there are any
@@ -78,7 +105,7 @@ struct assembly {
       const osm::NodeRef& nr = it->node_ref(state_.segment_list);
       const osm::Location& loc = nr.location();
       if (std::next(it) == locations.cend() ||
-          !loc.equal_to(std::next(it)->location(state_.segment_list))) {
+          loc != std::next(it)->location(state_.segment_list)) {
         if (state_.debug) {
           std::cerr << " Found open ring at " << nr.ref() << "\n";
         }
@@ -86,9 +113,9 @@ struct assembly {
         state_.problem_reporter.report_ring_not_closed(nr, segment.way());
         ++state_.stats.open_rings;
       } else {
-        if (loc.equal_to(previous_location) &&
+        if (loc == previous_location &&
             (state_.split_locations.empty() ||
-             !state_.split_locations.back().equal_to(previous_location))) {
+             state_.split_locations.back() != previous_location)) {
           state_.split_locations.push_back(previous_location);
         }
         ++it;
@@ -116,8 +143,8 @@ struct assembly {
         auto it = std::lower_bound(
             locations.cbegin(), locations.cend(), slocation{},
             [this, &location](const slocation& lhs, const slocation& rhs) {
-              return lhs.location(state_.segment_list, location)
-                  .smaller_than(rhs.location(state_.segment_list, location));
+              return lhs.location(state_.segment_list, location) <
+                     rhs.location(state_.segment_list, location);
             });
         ////assert(it != m_locations.cend());
         const osm::object_id_type id = it->node_ref(state_.segment_list).ref();
@@ -233,11 +260,18 @@ struct assembly {
    * Assembles area objects from closed ways or multipolygon relations
    * and their members.
    */
-  // HIER STEHEN GEBLIEBEN
+  // HIER STEHEN GEBLIEBEN!!
   bool create_area_from_way(std::vector<int>& out_buffer, const osm::Way& way) {
     // osm::AreaBuilder builder{out_buffer};
     // builder.initialize_from_object(way);
 
+    /*
+     * Im AreaBuilder wird irgendwie der outbuffer in eine osmium::Area
+     * verwandelt/geschrieben, da muss ich schauen wie ich das umsetze
+     * sieht viel zu kompliziert für das hier aus
+     * Also die rings müssen mit der add_rings_to_area funktion zur Area werden,
+     * aber WIE?
+     */
     const bool area_okay = create_rings();
     if (area_okay || state_.stats.create_empty_areas) {
       // builder.add_item(way.tags());
@@ -248,34 +282,34 @@ struct assembly {
     return area_okay || state_.stats.create_empty_areas;
   }
 
-  //   bool create_area_from_relation(
-  //       osmium::memory::Buffer& out_buffer,
-  //       const osmium::Relation& relation,
-  //       const std::vector<const osmium::Way*>& members) {
-  //     set_num_members(members.size());
-  //     osm::AreaBuilder builder{out_buffer};
-  //     builder.initialize_from_object(relation);
+  template <typename Members>
+  bool create_area_from_relation(std::vector<int>& out_buffer,
+                                 const osm::Relation<Members>& relation,
+                                 const std::vector<const osm::Way*>& members) {
+    //     set_num_members(members.size());
+    //     osm::AreaBuilder builder{out_buffer};
+    //     builder.initialize_from_object(relation);
 
-  //     const bool area_okay = create_rings();
-  //     if (area_okay || config().create_empty_areas) {
-  //       if (config().keep_type_tag) {
-  //         builder.add_item(relation.tags());
-  //       } else {
-  //         copy_tags_without_type(builder, relation.tags());
-  //       }
-  //     }
-  //     if (area_okay) {
-  //       add_rings_to_area(builder);
-  //     }
+    //     const bool area_okay = create_rings();
+    //     if (area_okay || config().create_empty_areas) {
+    //       if (config().keep_type_tag) {
+    //         builder.add_item(relation.tags());
+    //       } else {
+    //         copy_tags_without_type(builder, relation.tags());
+    //       }
+    //     }
+    //     if (area_okay) {
+    //       add_rings_to_area(builder);
+    //     }
 
-  //     if (report_ways()) {
-  //       for (const osmium::Way* way : members) {
-  //         config().problem_reporter->report_way(*way);
-  //       }
-  //     }
+    //     if (report_ways()) {
+    //       for (const osmium::Way* way : members) {
+    //         config().problem_reporter->report_way(*way);
+    //       }
+    //     }
 
-  //     return area_okay || config().create_empty_areas;
-  //   }
+    //     return area_okay || config().create_empty_areas;
+  }
 
   /**
    * Assemble an area from the given way.
