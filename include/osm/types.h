@@ -76,7 +76,8 @@ struct NodeRef {
 struct Way {
   object_id_type id;
   std::vector<NodeRef> node_refs;
-  std::vector<NodeRef> nodes() const { return node_refs; }
+  std::vector<NodeRef>& nodes() { return node_refs; }
+  const std::vector<NodeRef>& nodes() const { return node_refs; }
   bool ends_have_same_id() const noexcept {
     // assert(!nodes().empty());
     return nodes().front().ref() == nodes().back().ref();

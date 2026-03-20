@@ -27,7 +27,7 @@ NodeRefSegment* get_next_segment(const osm::Location& location) {
   if (state_.segment_list[it->item].is_done()) {
     ++it;
   }
-  assert(it != state_.locations.end());
+  assert(it != state_.slocations.end());
   assert(!state_.segment_list[it->item].is_done());
   return &state_.segment_list[it->item];
 }

@@ -480,7 +480,7 @@ struct SegmentList {
     auto way_it = ways.cbegin();
     for (const auto& member : relation.members()) {
       if (member.type == osm::member_type::kWay) {
-        assert(way_it != ways.cend());
+        // assert(way_it != ways.cend());
         if (ids.count((*way_it)->id) == 0) {
           ids.insert((*way_it)->id);
           const auto role = parse_role(member.role);
@@ -653,5 +653,11 @@ struct rings_stack_element {
     return m_y < rhs.m_y;
   }
 };  // struct rings_stack_element
+
+// gemacht um immer wieder zu verwenden...
+struct polygon_area {
+  // TODO fill!
+  // void reset() {}
+};
 
 }  // namespace assembler

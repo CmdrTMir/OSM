@@ -1,9 +1,5 @@
 #pragma once
 
-#include "assembler/assemble_rings.h"
-#include "assembler/assembler_types.h"
-#include "assembler/state.h"
-
 #include <cassert>
 #include <iostream>
 #include <list>
@@ -11,35 +7,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include "assembler/assemble_rings.h"
+#include "assembler/assembler_types.h"
+#include "assembler/state.h"
+
 namespace assembler {
 struct assembly {
-
-  // template <typename TBuilder>
-  // static void build_ring_from_proto_ring(osmium::builder::AreaBuilder&
-  // builder,
-  //                                        const ProtoRing& ring) {
-  //   TBuilder ring_builder{builder};
-  //   ring_builder.add_node_ref(ring.get_node_ref_start());
-  //   for (const auto& segment : ring.segments()) {
-  //     ring_builder.add_node_ref(segment->stop());
-  //   }
-  // }
-  // /**
-  //  * Append each outer ring together with its inner rings to the
-  //  * area in the buffer.
-  //  */
-  // void add_rings_to_area(osmium::builder::AreaBuilder& builder) const {
-  //   for (const ProtoRing& ring : m_rings) {
-  //     if (ring.is_outer()) {
-  //       build_ring_from_proto_ring<osmium::builder::OuterRingBuilder>(builder,
-  //                                                                     ring);
-  //       for (const ProtoRing* inner : ring.inner_rings()) {
-  //         build_ring_from_proto_ring<osmium::builder::InnerRingBuilder>(builder,
-  //                                                                       *inner);
-  //       }
-  //     }
-  //   }
-  // }
 
   bool create_rings() {
     state_.stats.nodes += state_.segment_list.size();
@@ -69,12 +42,11 @@ struct assembly {
     if (state_.stats.intersections) {
       return false;
     }
-    // locations: An ordered list of locations of both endpoints
+    // slocations: An ordered list of locations of both endpoints
     // of all segments with pointers back to the segments. We will
     // use this list later to quickly find which segment(s) fits
     // onto a known segment.
-    std::vector<slocation> locations;
-    locations.reserve(state_.segment_list.size() * 2);
+    state_.slocations.reserve(state_.segment_list.size() * 2);
     // static_cast is okay here: The 32bit limit is way past
     // anything that makes sense here and even if there are
     // 2^32 segments here, it would simply not go through
@@ -82,10 +54,10 @@ struct assembly {
     assert(state_.segment_list.size() < std::numeric_limits<uint32_t>::max());
     for (uint32_t n = 0; n < static_cast<uint32_t>(state_.segment_list.size());
          ++n) {
-      locations.emplace_back(n, false);
-      locations.emplace_back(n, true);
+      state_.slocations.emplace_back(n, false);
+      state_.slocations.emplace_back(n, true);
     }
-    std::stable_sort(locations.begin(), locations.end(),
+    std::stable_sort(state_.slocations.begin(), state_.slocations.end(),
                      [this](const slocation& lhs, const slocation& rhs) {
                        return lhs.location(state_.segment_list) <
                               rhs.location(state_.segment_list);
@@ -98,13 +70,13 @@ struct assembly {
      * If there are any open rings found along the way, they are reported
      * and the function returns false.
      */
-    bool found_split_locations = false;  // richtig initialisiert?
-    // std::vector<osm::Location> split_locations;
+    bool found_open_rings = false;  // bool found_split_locations = false;
     osm::Location previous_location;
-    for (auto it = locations.cbegin(); it != locations.cend(); ++it) {
+    for (auto it = state_.slocations.cbegin(); it != state_.slocations.cend();
+         ++it) {
       const osm::NodeRef& nr = it->node_ref(state_.segment_list);
       const osm::Location& loc = nr.location();
-      if (std::next(it) == locations.cend() ||
+      if (std::next(it) == state_.slocations.cend() ||
           loc != std::next(it)->location(state_.segment_list)) {
         if (state_.debug) {
           std::cerr << " Found open ring at " << nr.ref() << "\n";
@@ -119,18 +91,14 @@ struct assembly {
           state_.split_locations.push_back(previous_location);
         }
         ++it;
-        if (it == locations.end()) {
+        if (it == state_.slocations.end()) {
           break;
         }
       }
       previous_location = loc;
     }
-    found_split_locations = state_.stats.open_rings == 0;
-    //?????
-    // if (!find_split_locations()) {
-    //   return false;
-    // }
-    if (!found_split_locations) {
+    found_open_rings = state_.stats.open_rings != 0;
+    if (found_open_rings) {
       return false;
     }
     // Now report all split locations to the problem reporter.
@@ -141,12 +109,12 @@ struct assembly {
       }
       for (const auto& location : state_.split_locations) {
         auto it = std::lower_bound(
-            locations.cbegin(), locations.cend(), slocation{},
+            state_.slocations.cbegin(), state_.slocations.cend(), slocation{},
             [this, &location](const slocation& lhs, const slocation& rhs) {
               return lhs.location(state_.segment_list, location) <
                      rhs.location(state_.segment_list, location);
             });
-        assert(it != locations.cend());
+        assert(it != state_.slocations.cend());
         const osm::object_id_type id = it->node_ref(state_.segment_list).ref();
         state_.problem_reporter.report_touching_ring(id, location);
         if (state_.debug) {
@@ -158,7 +126,6 @@ struct assembly {
     // whether there were any split locations or not. If there
     // are no splits, we use the faster "simple algorithm", if
     // there are, we use the slower "complex algorithm".
-    std::list<ProtoRing> rings;  // TODO
     if (state_.split_locations.empty()) {
       if (state_.debug) {
         std::cerr << " No split locations -> using simple algorithm\n";
@@ -166,7 +133,7 @@ struct assembly {
       ++state_.stats.area_simple_case;
       // create_rings_simple_case:
       auto count_remaining = state_.segment_list.size();
-      for (const slocation& sl : locations) {
+      for (const slocation& sl : state_.slocations) {
         const NodeRefSegment& segment = state_.segment_list[sl.item];
         if (!segment.is_done()) {
           count_remaining -= add_new_ring(sl);
@@ -187,7 +154,7 @@ struct assembly {
                   << " split locations -> using complex algorithm\n";
       }
       ++state_.stats.area_touching_rings_case;
-      if (!create_rings_complex_case()) {  // TODO
+      if (!create_rings_complex_case()) {
         return false;
       }
     }
@@ -200,7 +167,7 @@ struct assembly {
     int count_segments_for_debug = 0;
     std::unordered_map<const osm::Way*, const ProtoRing*> way_rings;
     std::unordered_set<const osm::Way*> ways_in_multiple_rings;
-    for (const ProtoRing& ring : rings) {
+    for (const ProtoRing& ring : state_.rings) {
       for (const auto& segment : ring.segments()) {
         count_segments_for_debug++;
         assert(segment->way());
@@ -245,15 +212,15 @@ struct assembly {
     // check_inner_outer_roles - finished
 
     state_.stats.outer_rings =
-        std::count_if(rings.cbegin(), rings.cend(),
+        std::count_if(state_.rings.cbegin(), state_.rings.cend(),
                       [](const ProtoRing& ring) { return ring.is_outer(); });
-    state_.stats.inner_rings = rings.size() - state_.stats.outer_rings;
+    state_.stats.inner_rings = state_.rings.size() - state_.stats.outer_rings;
     return true;
   }
 
   ////
   /*
-   * This is the assembler ---
+   * This is the start of the assembler ---
    */
   ////
   /**
@@ -261,7 +228,7 @@ struct assembly {
    * and their members.
    */
   // HIER STEHEN GEBLIEBEN!!
-  bool create_area_from_way(std::vector<int>& out_buffer, const osm::Way& way) {
+  bool create_area(polygon_area& out_buffer) {
     // osm::AreaBuilder builder{out_buffer};
     // builder.initialize_from_object(way);
 
@@ -272,56 +239,73 @@ struct assembly {
      * Also die rings müssen mit der add_rings_to_area funktion zur Area werden,
      * aber WIE?
      *
-     * TODO: state init und check locations/rings etc in create_rings
+     * TODO: state init
      */
     const bool area_okay = create_rings();
-    if (area_okay || state_.stats.create_empty_areas) {
-      // builder.add_item(way.tags());
-    }
+    // if (area_okay || state_.stats.create_empty_areas) {
+    //  builder.add_item(way.tags());
+    //}
     if (area_okay) {
+      // for (const ProtoRing& ring : state_.rings) {
+      //   if (ring.is_outer()) {
+      //     TBuilder ring_builder{builder};
+      //     ring_builder.add_node_ref(ring.get_node_ref_start());
+      //     for (const auto& segment : ring.segments()) {
+      //       ring_builder.add_node_ref(segment->stop());
+      //     }
+      //     for (const ProtoRing* inner : ring.inner_rings()) {
+      //       TBuilder ring_builder{builder};
+      //       ring_builder.add_node_ref(ring.get_node_ref_start());
+      //       for (const auto& segment : ring.segments()) {
+      //         ring_builder.add_node_ref(segment->stop());
+      //       }
+      //     }
+      //   }
+      // }
       // add_rings_to_area(builder);
     }
-    return area_okay || state_.stats.create_empty_areas;
+    return area_okay;  // || state_.stats.create_empty_areas;
   }
 
-  template <typename Members>
-  bool create_area_from_relation(std::vector<int>& out_buffer,
-                                 const osm::Relation<Members>& relation,
-                                 const std::vector<const osm::Way*>& members) {
-    //     set_num_members(members.size());
-    //     osm::AreaBuilder builder{out_buffer};
-    //     builder.initialize_from_object(relation);
+  // template <typename Members>
+  // bool create_area_from_relation(std::vector<int>& out_buffer,
+  //                                const osm::Relation<Members>& relation,
+  //                                const std::vector<const osm::Way*>& members)
+  //                                {
+  //   set_num_members(members.size());
+  //   osm::AreaBuilder builder{out_buffer};
+  //   builder.initialize_from_object(relation);
 
-    //     const bool area_okay = create_rings();
-    //     if (area_okay || config().create_empty_areas) {
-    //       if (config().keep_type_tag) {
-    //         builder.add_item(relation.tags());
-    //       } else {
-    //         copy_tags_without_type(builder, relation.tags());
-    //       }
-    //     }
-    //     if (area_okay) {
-    //       add_rings_to_area(builder);
-    //     }
+  //   const bool area_okay = create_rings();
+  //   if (area_okay || config().create_empty_areas) {
+  //     if (config().keep_type_tag) {
+  //       builder.add_item(relation.tags());
+  //     } else {
+  //       copy_tags_without_type(builder, relation.tags());
+  //     }
+  //   }
+  //   if (area_okay) {
+  //     add_rings_to_area(builder);
+  //   }
 
-    //     if (report_ways()) {
-    //       for (const osmium::Way* way : members) {
-    //         config().problem_reporter->report_way(*way);
-    //       }
-    //     }
+  //   if (report_ways()) {
+  //     for (const osm::Way* way : members) {
+  //       config().problem_reporter->report_way(*way);
+  //     }
+  //   }
 
-    //     return area_okay || config().create_empty_areas;
-  }
+  //   return area_okay || config().create_empty_areas;
+  // }
 
   /**
    * Assemble an area from the given way.
    * The resulting area is put into the out_buffer.
-   *
+   * Not used - added for completeness
    * @returns false if there was some kind of error building the
    *          area, true otherwise.
    */
   bool assembling_area_from_way(const osm::Way& way,
-                                std::vector<int>& out_buffer,
+                                polygon_area& out_buffer,
                                 bool report_problems = true) {
     if (!state_.stats.create_way_polygons) {
       return true;
@@ -353,7 +337,7 @@ struct assembly {
       std::cerr << "\nAssembling way " << way.id << " containing "
                 << state_.segment_list.size() << " nodes\n";
     }
-    const bool okay = create_area_from_way(out_buffer, way);
+    const bool okay = create_area(out_buffer);
     if (state_.debug) {
       std::cerr << "Done: " << std::endl;
       state_.stats.print_stats();
@@ -371,13 +355,13 @@ struct assembly {
   template <typename Members>
   bool assembling_area_from_relation(const osm::Relation<Members>& relation,
                                      const std::vector<const osm::Way*>& ways,
-                                     std::vector<int>& out_buffer,
+                                     polygon_area& out_buffer,
                                      bool report_problems = true) {
     // if (!config().create_new_style_polygons) {
     //   return true;
     // }
 
-    // assert(relation.cmembers().size() >= members.size());
+    assert(relation.members().size() >= ways.size());
 
     // if (config().problem_reporter) {
     //   config().problem_reporter->set_object(osm::item_type::relation,
@@ -408,7 +392,7 @@ struct assembly {
                 << ways.size() << " way members with "
                 << state_.segment_list.size() << " nodes\n";
     }
-    const bool okay = create_area_from_relation(out_buffer, relation, ways);
+    const bool okay = create_area(out_buffer);
     // if (okay) {
     //   out_buffer.commit();
     // } else {

@@ -293,9 +293,6 @@ void get_coords(hybrid_node_idx const& nodes,
   }
 }
 
-// FRAGE: was genau wird mit update_locations geupdated?
-// Was ist mit der way funktion weiter unten?
-// mein versuch
 void update_locations_of_way(hybrid_node_idx const& nodes, osm::Way& way) {
   std::vector<std::pair<osm_id_t, osm::Location*>> query_;
   for (auto& node_ref : way.nodes()) {
@@ -320,13 +317,10 @@ void update_locations_of_way(hybrid_node_idx const& nodes, osm::Way& way) {
 //     }
 //     std::vector<std::pair<osm_id_t, osm::Location*>> query_;
 //   };
-
 //   query_builder builder;
 //   // o::apply(buffer, builder);
-
 //   if (!builder.query_.empty()) {
 //     get_coords(nodes, builder.query_);
-
 //     for (auto const& pair : builder.query_) {
 //       pair.second->set_x(pair.second->x() - hybrid_node_idx::x_offset);
 //       pair.second->set_y(pair.second->y() - hybrid_node_idx::y_offset);

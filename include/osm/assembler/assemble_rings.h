@@ -114,7 +114,6 @@ std::uint32_t add_new_ring(const slocation& node) {
   return nodes;
 }
 
-// NEXT:
 bool create_rings_complex_case() {
   // First create all the (partial) rings starting at the split locations
   auto count_remaining = state_.segment_list.size();

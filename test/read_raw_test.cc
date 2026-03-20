@@ -7,6 +7,7 @@
 
 #include "utl/progress_tracker.h"
 
+#include "osm/assembler/assembler_types.h"
 #include "osm/decoder.h"
 #include "osm/filing/tmp_file.h"
 #include "osm/hnidx/hybrid_node_index.h"
@@ -144,9 +145,9 @@ TEST(c, d) {
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
 
-  auto vec_mtx = std::mutex{};
-  auto mp_vec = std::vector<osm::multi_polygon>{};
-  // auto mp = osm::multi_polygon{};
+  // auto vec_mtx = std::mutex{};
+  // auto mp_vec = std::vector<osm::multi_polygon>{};
+  //  auto mp = osm::multi_polygon{};
   std::atomic_uint64_t relations_count = 0;
   std::atomic_uint64_t ways_count = 0;
   std::atomic_uint64_t relations_count2 = 0;
@@ -168,16 +169,12 @@ TEST(c, d) {
       [&](std::int64_t, auto&&, auto&&) { ways_count++; },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
         relations_count++;
-        auto mp = osm::multi_polygon{};
-        osm::save_ways_of_relation(mp, id, members, tags);
-        std::lock_guard<std::mutex> lock(vec_mtx);
-        mp_vec.emplace_back(mp);
+        osm::save_ways_of_relation(id, members, tags);
       },
       pt);
 
   std::cout << " \t In the middle: " << std::endl;
-  std::cout << "vec_size: " << mp_vec.size()
-            << " relations_count: " << relations_count
+  std::cout << " relations_count: " << relations_count
             << " ways_count (0): " << ways_count << std::endl;
 
   r.reset_reader();
@@ -187,14 +184,18 @@ TEST(c, d) {
       [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
         ways_count2++;
-        // TODO save nodes of ways
-        osm::Way tempway = osm::save_nodes_of_ways(node_idx, id, refs);
+        std::vector<osm::NodeRef> way_node_refs;
+        for (auto r : refs) {
+          way_node_refs.emplace_back(r);
+        }
+        osm::Way tempway{id, way_node_refs};
+        // nur ways geupdated!?!?!?!?
         tiles::update_locations_of_way(node_idx, tempway);
+        osm::save_ways(tempway);
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
         relations_count2++;
-        // auto mp = osm::multi_polygons{};
-        // auto a = osm::assemble_area(mp, id, members, tags);
+        auto a = osm::assemble_area(id, members, tags);
         //  TODO do something with final area
         //  a.outer_rings()
       },
