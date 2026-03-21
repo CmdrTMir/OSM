@@ -478,12 +478,12 @@ struct SegmentList {
     ids.reserve(ways.size());
     uint32_t invalid_locations = 0;
     auto way_it = ways.cbegin();
-    for (const auto& member : relation.members()) {
-      if (member.type == osm::member_type::kWay) {
+    for (const auto& [_, member_role, member_type] : relation.members()) {
+      if (member_type == osm::member_type::kWay) {
         // assert(way_it != ways.cend());
         if (ids.count((*way_it)->id) == 0) {
           ids.insert((*way_it)->id);
-          const auto role = parse_role(member.role);
+          const auto role = parse_role(member_role.data());
           invalid_locations += extract_segments_from_way_impl(
               problem_reporter, duplicate_nodes, **way_it, role);
         } else {

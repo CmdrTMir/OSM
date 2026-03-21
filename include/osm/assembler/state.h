@@ -20,6 +20,4 @@ struct State {
   std::vector<osm::Location> split_locations = std::vector<osm::Location>{};
 };
 
-inline State state_;
-
 }  // namespace assembler

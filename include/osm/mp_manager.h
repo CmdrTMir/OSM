@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "osm/assembler.h"
+#include "osm/assembler/assemble_rings.h"
 #include "osm/assembler/assembler_types.h"
 #include "osm/decoder.h"
 
@@ -36,13 +37,14 @@ void save_ways_of_relation(std::int64_t const id,
     return;
   }
   auto mp = osm::multi_polygon{};
+  mp.relation_id = id;
   for (auto const [ref, role, type] : members) {
     if (type != osm::member_type::kWay) {
       continue;
     }
     mp.ways_refs.emplace_back(ref);
   }
-  mp_vec_.emplace_back(id, mp);
+  mp_vec_.emplace_back(std::move(mp));
 }
 
 void save_ways(osm::Way way) { all_ways_.push_back(way); }
@@ -68,17 +70,18 @@ std::optional<assembler::polygon_area> assemble_area(std::int64_t const id,
   if (!is_area(tags)) {
     return {};
   }
+  assembler::assembly assemble = assembler::assembly{};
   bool worked = false;
   assembler::polygon_area a = assembler::polygon_area{};
   osm::Relation r = {id, members};
-  const std::vector<const osm::Way*>& ways = {};
+  std::vector<const osm::Way*> ways = {};
   for (auto elem : mp_vec_) {
     if (elem.relation_id == id) {
       ways = make_const_way_ptrs(elem.ways_refs);
-      worked = assembler::assembly::assembling_area_from_relation(r, ways, a);
       break;
     }
   }
+  worked = assemble.assembling_area_from_relation(r, ways, a);
   // add (way.tags()) to area ?
   return a;
 }

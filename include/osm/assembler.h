@@ -7,12 +7,28 @@
 #include <unordered_set>
 #include <vector>
 
-#include "assembler/assemble_rings.h"
 #include "assembler/assembler_types.h"
 #include "assembler/state.h"
 
 namespace assembler {
 struct assembly {
+
+  State state_;
+  // Definition of helper functions as members:
+  uint32_t add_new_ring_complex(const slocation& node);
+  std::uint32_t add_new_ring(const slocation& node);
+  bool create_rings_complex_case();
+  NodeRefSegment* get_next_segment(const osm::Location& location);
+  std::vector<location_to_ring_map> create_location_to_ring_map(
+      open_ring_its_type& open_ring_its);
+  void merge_two_rings(open_ring_its_type& open_ring_its,
+                       const location_to_ring_map& m1,
+                       const location_to_ring_map& m2);
+  bool try_to_merge(open_ring_its_type& open_ring_its);
+  ProtoRing* find_enclosing_ring(NodeRefSegment* segment);
+  void find_inner_outer_complex();
+  void find_inner_outer_complex(ProtoRing* ring);
+  bool join_connected_rings(open_ring_its_type& open_ring_its);
 
   bool create_rings() {
     state_.stats.nodes += state_.segment_list.size();
@@ -388,7 +404,7 @@ struct assembly {
     }
 
     if (state_.debug) {
-      std::cerr << "\nAssembling relation " << relation.id() << "containing "
+      std::cerr << "\nAssembling relation " << relation.id << "containing "
                 << ways.size() << " way members with "
                 << state_.segment_list.size() << " nodes\n";
     }
@@ -401,6 +417,6 @@ struct assembly {
     return okay;
   }
 
-};  // class Assembly
+};  // class assembly
 
 }  // namespace assembler
