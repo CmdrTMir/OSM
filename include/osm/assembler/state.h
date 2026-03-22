@@ -11,13 +11,20 @@ constexpr std::size_t max_split_locations_ = 100ULL;
 constexpr int max_depth = 20;
 
 struct State {
-  bool debug = true;
-  SegmentList segment_list = SegmentList{};
-  area_stats stats = area_stats{};
-  ProblemReporter problem_reporter = ProblemReporter{};
-  std::list<ProtoRing> rings = std::list<ProtoRing>{};
-  std::vector<slocation> slocations = std::vector<slocation>{};
-  std::vector<osm::Location> split_locations = std::vector<osm::Location>{};
+  State() = delete;
+  State(const State&) = delete;
+  State& operator=(const State&) = delete;
+  ~State() { std::cout << "STATE DESTROYED\n"; }
+  explicit State(std::ostream& out, bool enable_debug = true)
+      : problem_reporter(out), debug(enable_debug) {}
+
+  bool debug;
+  SegmentList segment_list{};
+  area_stats stats{};
+  ProblemReporter problem_reporter;
+  std::list<ProtoRing> rings{};
+  std::vector<slocation> slocations{};
+  std::vector<osm::Location> split_locations{};
 };
 
 }  // namespace assembler

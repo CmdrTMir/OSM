@@ -7,6 +7,10 @@
 namespace assembler {
 
 struct ProblemReporter {
+  bool report = true;
+  std::ostream* out_stream_;
+  ~ProblemReporter() { std::cout << "Reporter destroyed\n"; }
+  ProblemReporter(std::ostream& out) : out_stream_(&out) {}
 
   void header(const char* msg) {
     *out_stream_ << "DATA PROBLEM: " << msg << " ON ";
@@ -114,7 +118,5 @@ struct ProblemReporter {
     header("duplicate way");
     *out_stream_ << "way_id=" << way.id << '\n';
   }
-
-  std::ostream* out_stream_;
 };
 }  // namespace assembler
