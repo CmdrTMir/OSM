@@ -277,9 +277,11 @@ void decode_relation(std::string_view s,
       zip(keys, values) | transform([&](auto&& x) {
         return std::tuple{strings.at(get<0>(x)), strings.at(get<1>(x))};
       });
+  std::int64_t ref = 0;
   auto const members =
       zip(refs, roles, types) | transform([&](auto&& x) {
-        auto const [ref, role, type] = x;
+        auto const [delta, role, type] = x;
+        ref += delta;
         return std::tuple{ref, strings.at(role), member_type{type}};
       });
   f(id, members, tags);

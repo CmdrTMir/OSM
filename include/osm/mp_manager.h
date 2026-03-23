@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <mutex>
 #include <optional>
 
 #include "osm/assembler.h"
@@ -15,7 +16,9 @@ struct multi_polygon {
   std::vector<std::int64_t> ways_refs;
 };
 
+std::mutex mp_vec_mtx;
 std::vector<osm::multi_polygon> mp_vec_ = std::vector<osm::multi_polygon>{};
+std::mutex ways_vec_mtx;
 std::vector<osm::Way> all_ways_ = std::vector<osm::Way>{};  // speicherbedarf!?
 
 template <typename Tags>
@@ -44,10 +47,14 @@ void save_ways_of_relation(std::int64_t const id,
     }
     mp.ways_refs.emplace_back(ref);
   }
+  std::lock_guard<std::mutex> lock(mp_vec_mtx);
   mp_vec_.emplace_back(std::move(mp));
 }
 
-void save_ways(osm::Way way) { all_ways_.push_back(way); }
+void save_ways(osm::Way way) {
+  std::lock_guard<std::mutex> lock(ways_vec_mtx);
+  all_ways_.push_back(way);
+}
 
 std::vector<const osm::Way*> make_const_way_ptrs(
     const std::vector<object_id_type>& ids) {
@@ -82,7 +89,8 @@ std::optional<assembler::polygon_area> assemble_area(std::int64_t const id,
     }
   }
   worked = assemble.assembling_area_from_relation(r, ways, a);
-  // add (way.tags()) to area ?
+  std::cout << "Worked? " << worked << " Relation id: " << id << std::endl;
+  //  add (way.tags()) to area ?
   return a;
 }
 
