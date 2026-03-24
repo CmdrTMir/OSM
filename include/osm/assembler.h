@@ -14,6 +14,7 @@ namespace assembler {
 struct assembly {
 
   State state_;
+  assembly() : state_(std::cout, true) {}
   // Definition of helper functions as members:
   uint32_t add_new_ring_complex(const slocation& node);
   std::uint32_t add_new_ring(const slocation& node);
@@ -177,53 +178,55 @@ struct assembly {
     // If the assembler was so configured, now check whether the
     // member roles are correctly tagged. --> check always
     // check_inner_outer_roles:
-    if (state_.debug) {
+    // if (state_.debug) {
+    if (false) {
       std::cerr << "    Checking inner/outer roles\n";
-    }
-    int count_segments_for_debug = 0;
-    std::unordered_map<const osm::Way*, const ProtoRing*> way_rings;
-    std::unordered_set<const osm::Way*> ways_in_multiple_rings;
-    for (const ProtoRing& ring : state_.rings) {
-      for (const auto& segment : ring.segments()) {
-        count_segments_for_debug++;
-        assert(segment->way());
-        if (!segment->role_empty() &&
-            (ring.is_outer() ? !segment->role_outer()
-                             : !segment->role_inner())) {
-          ++state_.stats.wrong_role;
-          if (state_.debug) {
-            std::cerr << " Segment: " << count_segments_for_debug
-                      << " from way " << segment->way()->id << " has role '"
-                      << segment->role_name() << "', but should have role '"
-                      << (ring.is_outer() ? "outer" : "inner") << "'\n ";
+
+      int count_segments_for_debug = 0;
+      std::unordered_map<const osm::Way*, const ProtoRing*> way_rings;
+      std::unordered_set<const osm::Way*> ways_in_multiple_rings;
+      for (const ProtoRing& ring : state_.rings) {
+        for (const auto& segment : ring.segments()) {
+          count_segments_for_debug++;
+          assert(segment->way());
+          if (!segment->role_empty() &&
+              (ring.is_outer() ? !segment->role_outer()
+                               : !segment->role_inner())) {
+            ++state_.stats.wrong_role;
+            if (state_.debug) {
+              std::cerr << " Segment: " << count_segments_for_debug
+                        << " from way " << segment->way()->id << " has role '"
+                        << segment->role_name() << "', but should have role '"
+                        << (ring.is_outer() ? "outer" : "inner") << "'\n ";
+            }
+            if (ring.is_outer()) {
+              state_.problem_reporter.report_role_should_be_outer(
+                  segment->way()->id, segment->first().location(),
+                  segment->second().location());
+            } else {
+              state_.problem_reporter.report_role_should_be_inner(
+                  segment->way()->id, segment->first().location(),
+                  segment->second().location());
+            }
           }
-          if (ring.is_outer()) {
-            state_.problem_reporter.report_role_should_be_outer(
-                segment->way()->id, segment->first().location(),
-                segment->second().location());
-          } else {
-            state_.problem_reporter.report_role_should_be_inner(
-                segment->way()->id, segment->first().location(),
-                segment->second().location());
+          auto& r = way_rings[segment->way()];
+          if (!r) {
+            r = &ring;
+          } else if (r != &ring) {
+            ways_in_multiple_rings.insert(segment->way());
           }
         }
-        auto& r = way_rings[segment->way()];
-        if (!r) {
-          r = &ring;
-        } else if (r != &ring) {
-          ways_in_multiple_rings.insert(segment->way());
+        count_segments_for_debug = 0;
+      }
+      for (const osm::Way* way :
+           ways_in_multiple_rings) {  // NOLINT(bugprone - nondeterministic -
+                                      // pointer - iteration - order)
+        ++state_.stats.ways_in_multiple_rings;
+        if (state_.debug) {
+          std::cerr << " Way " << way->id << " is in multiple rings\n ";
         }
+        state_.problem_reporter.report_way_in_multiple_rings(*way);
       }
-      count_segments_for_debug = 0;
-    }
-    for (const osm::Way* way :
-         ways_in_multiple_rings) {  // NOLINT(bugprone - nondeterministic -
-                                    // pointer - iteration - order)
-      ++state_.stats.ways_in_multiple_rings;
-      if (state_.debug) {
-        std::cerr << " Way " << way->id << " is in multiple rings\n ";
-      }
-      state_.problem_reporter.report_way_in_multiple_rings(*way);
     }
     // check_inner_outer_roles - finished
 
@@ -234,51 +237,38 @@ struct assembly {
     return true;
   }
 
-  ////
-  /*
-   * This is the start of the assembler ---
-   */
-  ////
   /**
    * Assembles area objects from closed ways or multipolygon relations
    * and their members.
    */
-  // HIER STEHEN GEBLIEBEN!!
   bool create_area(polygon_area& out_buffer) {
-    // osm::AreaBuilder builder{out_buffer};
-    // builder.initialize_from_object(way);
-
-    /*
-     * Im AreaBuilder wird irgendwie der outbuffer in eine osmium::Area
-     * verwandelt/geschrieben, da muss ich schauen wie ich das umsetze
-     * sieht viel zu kompliziert für das hier aus
-     * Also die rings müssen mit der add_rings_to_area funktion zur Area werden,
-     * aber WIE?
-     *
-     * TODO: state init
-     */
     const bool area_okay = create_rings();
     // if (area_okay || state_.stats.create_empty_areas) {
     //  builder.add_item(way.tags());
     //}
     if (area_okay) {
-      // for (const ProtoRing& ring : state_.rings) {
-      //   if (ring.is_outer()) {
-      //     TBuilder ring_builder{builder};
-      //     ring_builder.add_node_ref(ring.get_node_ref_start());
-      //     for (const auto& segment : ring.segments()) {
-      //       ring_builder.add_node_ref(segment->stop());
-      //     }
-      //     for (const ProtoRing* inner : ring.inner_rings()) {
-      //       TBuilder ring_builder{builder};
-      //       ring_builder.add_node_ref(ring.get_node_ref_start());
-      //       for (const auto& segment : ring.segments()) {
-      //         ring_builder.add_node_ref(segment->stop());
-      //       }
-      //     }
-      //   }
-      // }
-      // add_rings_to_area(builder);
+      std::vector<area_pair> area;
+      for (const ProtoRing& ring : state_.rings) {
+        std::vector<osm::NodeRef> area_part;
+        std::vector<std::int64_t> offsets;
+        if (ring.is_outer()) {
+          offsets.push_back(area_part.size());
+          area_part.emplace_back(ring.get_node_ref_start());
+          for (const auto& segment : ring.segments()) {
+            area_part.emplace_back(segment->stop());
+          }
+          for (const ProtoRing* inner : ring.inner_rings()) {
+            offsets.push_back(area_part.size());
+            area_part.emplace_back(inner->get_node_ref_start());
+            for (const auto& segment : inner->segments()) {
+              area_part.emplace_back(segment->stop());
+            }
+          }
+        }
+        area.emplace_back(area_part, offsets);
+      }
+      out_buffer.valid = area_okay;
+      out_buffer.area = std::move(area);
     }
     return area_okay;  // || state_.stats.create_empty_areas;
   }
@@ -344,7 +334,7 @@ struct assembly {
     ++state_.stats.from_ways;
     state_.stats.invalid_locations =
         state_.segment_list.extract_segments_from_way(
-            &state_.problem_reporter, state_.stats.duplicate_nodes, way);
+            state_.problem_reporter, state_.stats.duplicate_nodes, way);
     // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
     if (state_.stats.invalid_locations > 0) {
       return false;
@@ -391,7 +381,7 @@ struct assembly {
     ++state_.stats.from_relations;
     state_.stats.invalid_locations =
         state_.segment_list.extract_segments_from_ways(
-            &state_.problem_reporter, state_.stats.duplicate_nodes,
+            state_.problem_reporter, state_.stats.duplicate_nodes,
             state_.stats.duplicate_ways, relation, ways);
     // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
     if (state_.stats.invalid_locations > 0) {
@@ -409,11 +399,6 @@ struct assembly {
                 << state_.segment_list.size() << " nodes\n";
     }
     const bool okay = create_area(out_buffer);
-    // if (okay) {
-    //   out_buffer.commit();
-    // } else {
-    //   out_buffer.rollback();
-    // }
     return okay;
   }
 

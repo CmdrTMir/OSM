@@ -1,3 +1,4 @@
+#include <chrono>
 #include <ranges>
 #include <string_view>
 
@@ -152,6 +153,8 @@ TEST(c, d) {
   std::atomic_uint64_t ways_count = 0;
   std::atomic_uint64_t relations_count2 = 0;
   std::atomic_uint64_t ways_count2 = 0;
+  std::atomic_bool first = true;
+  std::atomic_uint64_t worked_count = 0;
 
   auto tmp_dname = std::filesystem::temp_directory_path();
   auto const node_idx_file = tiles::tmp_file{
@@ -185,23 +188,41 @@ TEST(c, d) {
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
         ways_count2++;
         std::vector<osm::NodeRef> way_node_refs;
+        std::int64_t acc = 0;
         for (auto r : refs) {
-          way_node_refs.emplace_back(r);
+          acc += r;
+          way_node_refs.emplace_back(acc);
         }
         osm::Way tempway{id, way_node_refs};
-        // nur ways geupdated!?!?!?!?
         tiles::update_locations_of_way(node_idx, tempway);
         osm::save_ways(tempway);
+        if (ways_count2 == 1276568) {
+          auto now = std::chrono::system_clock::now();
+          std::time_t time_t = std::chrono::system_clock::to_time_t(now);
+          std::cout << "Way: " << std::ctime(&time_t);
+        }
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
+        if (first) {
+          auto now = std::chrono::system_clock::now();
+          std::time_t time_t = std::chrono::system_clock::to_time_t(now);
+          std::cout << "\t FIRST RELATION TIME: " << std::ctime(&time_t);
+          first = false;
+        }
         relations_count2++;
-        auto a = osm::assemble_area(id, members, tags);
-        //  TODO do something with final area
-        //  a.outer_rings()
+        // std::optional<assembler::polygon_area> a =
+        assembler::polygon_area a = osm::assemble_area(id, members, tags);
+        if (a.valid) {
+          worked_count++;
+          //  do something with final area
+          std::cout << "AREA BUILT! area size: " << a.area.size() << "; "
+                    << a.get_all_outers().size() << std::endl;
+        }
       },
       pt);
 
   std::cout << " \t At the end: " << std::endl;
-  std::cout << "relations_count2: " << relations_count2
-            << " ways_count2 (1276568): " << ways_count2 << std::endl;
+  std::cout << "area count " << worked_count << "/" << relations_count2
+            << " (realtions2) \n ways_count2 (1276568): " << ways_count2
+            << std::endl;
 }

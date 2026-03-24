@@ -71,15 +71,15 @@ std::vector<const osm::Way*> make_const_way_ptrs(
 }
 
 template <typename Members, typename Tags>
-std::optional<assembler::polygon_area> assemble_area(std::int64_t const id,
-                                                     Members&& members,
-                                                     Tags&& tags) {
+assembler::polygon_area assemble_area(std::int64_t const id,
+                                      Members&& members,
+                                      Tags&& tags) {
+  assembler::polygon_area a(id);
   if (!is_area(tags)) {
-    return {};
+    return a;
   }
   assembler::assembly assemble = assembler::assembly{};
   bool worked = false;
-  assembler::polygon_area a = assembler::polygon_area{};
   osm::Relation r = {id, members};
   std::vector<const osm::Way*> ways = {};
   for (auto elem : mp_vec_) {

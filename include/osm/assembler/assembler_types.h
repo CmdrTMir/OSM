@@ -377,18 +377,17 @@ struct SegmentList {
                            });
   }
 
-  uint32_t extract_segments_from_way_impl(ProblemReporter* problem_reporter,
+  uint32_t extract_segments_from_way_impl(ProblemReporter& problem_reporter,
                                           uint64_t& duplicate_nodes,
                                           const osm::Way& way,
                                           role_type role) {
     uint32_t invalid_locations = 0;
-
     auto previous_nr = osm::NodeRef{};
     for (const osm::NodeRef& nr : way.nodes()) {
       if (!nr.location().valid()) {
         ++invalid_locations;
-        if (problem_reporter) {
-          problem_reporter->report_invalid_location(way.id, nr.ref());
+        if (problem_reporter.report) {
+          problem_reporter.report_invalid_location(way.id, nr.ref());
         }
         continue;
       }
@@ -396,9 +395,9 @@ struct SegmentList {
         segments_.emplace_back(previous_nr, nr, role, &way);
       } else {
         ++duplicate_nodes;
-        if (problem_reporter) {
-          problem_reporter->report_duplicate_node(previous_nr.ref(), nr.ref(),
-                                                  nr.location());
+        if (problem_reporter.report) {
+          problem_reporter.report_duplicate_node(previous_nr.ref(), nr.ref(),
+                                                 nr.location());
         }
       }
       previous_nr = nr;
@@ -406,7 +405,6 @@ struct SegmentList {
     return invalid_locations;
   }
 
-  // TODO: see if and when segments_ is initialised?
   SegmentList() = default;
   SegmentList(const SegmentList&) = delete;
   SegmentList(SegmentList&&) = delete;
@@ -443,7 +441,7 @@ struct SegmentList {
    * same node or different nodes with same location) are
    * removed after reporting the duplicate node.
    */
-  uint32_t extract_segments_from_way(ProblemReporter* problem_reporter,
+  uint32_t extract_segments_from_way(ProblemReporter& problem_reporter,
                                      uint64_t& duplicate_nodes,
                                      const osm::Way& way) {
     if (way.nodes().empty()) {
@@ -457,11 +455,12 @@ struct SegmentList {
   /**
    * Extract all segments from all ways that make up this
    * multipolygon relation and add them to the list.
-   * Umgeschrieben
+   * und hier ist der crash im if (ids.count((*way_it)->id) ==
+   * 0) iterator!!!
    */
   template <typename Members>
   uint32_t extract_segments_from_ways(
-      ProblemReporter* problem_reporter,
+      ProblemReporter& problem_reporter,
       uint64_t& duplicate_nodes,
       uint64_t& duplicate_ways,
       const osm::Relation<Members>& relation,
@@ -480,6 +479,10 @@ struct SegmentList {
     auto way_it = ways.cbegin();
     for (const auto& [_, member_role, member_type] : relation.members()) {
       if (member_type == osm::member_type::kWay) {
+        if (way_it == ways.cend()) {
+          std::cout << "way iter end reached! " << std::endl;
+          break;
+        }
         // assert(way_it != ways.cend());
         if (ids.count((*way_it)->id) == 0) {
           ids.insert((*way_it)->id);
@@ -488,8 +491,8 @@ struct SegmentList {
               problem_reporter, duplicate_nodes, **way_it, role);
         } else {
           ++duplicate_ways;
-          if (problem_reporter) {
-            problem_reporter->report_duplicate_way(**way_it);
+          if (problem_reporter.report) {
+            problem_reporter.report_duplicate_way(**way_it);
           }
         }
         ++way_it;
@@ -654,10 +657,58 @@ struct rings_stack_element {
   }
 };  // struct rings_stack_element
 
-// gemacht um immer wieder zu verwenden...
+struct area_pair {
+  std::vector<osm::NodeRef> area_part;
+  std::vector<std::int64_t> offsets;
+
+  std::span<const osm::NodeRef> get_outer() const {
+    if (offsets.empty()) return {};
+    std::size_t start = offsets[0];
+    std::size_t end = (offsets.size() > 1) ? offsets[1] : area_part.size();
+    return {area_part.data() + start, end - start};
+  }
+
+  std::span<const osm::NodeRef> get_inner_at(std::size_t i) const {
+    if (offsets.size() <= i + 1) return {};
+    std::size_t start = offsets[i + 1];
+    std::size_t end =
+        (i + 2 < offsets.size()) ? offsets[i + 2] : area_part.size();
+    return {area_part.data() + start, end - start};
+  }
+
+  std::span<const osm::NodeRef> get_inners() const {
+    if (offsets.size() <= 1) return {};
+    std::size_t start = offsets[1];
+    std::size_t end = area_part.size();
+    return {area_part.data() + start, end - start};
+  }
+};
+
 struct polygon_area {
-  // TODO fill!
-  // void reset() {}
+  std::int64_t relation_id;
+  bool valid = false;
+  std::vector<area_pair> area;
+
+  explicit polygon_area(std::int64_t id) : relation_id(id) {}
+
+  std::vector<std::span<const osm::NodeRef>> get_all_outers() {
+    std::vector<std::span<const osm::NodeRef>> result;
+    for (auto const& ap : area) {
+      result.push_back(ap.get_outer());
+    }
+    return result;
+  }
+
+  std::vector<std::span<const osm::NodeRef>> get_all_inners_as_vec(
+      std::size_t outer_index) {
+    std::vector<std::span<const osm::NodeRef>> result;
+    if (outer_index >= area.size()) return result;
+    auto const& ap = area[outer_index];
+    for (std::size_t i = 0; i + 1 < ap.offsets.size(); ++i) {
+      result.push_back(ap.get_inner_at(i));
+    }
+    return result;
+  }
 };
 
 }  // namespace assembler
