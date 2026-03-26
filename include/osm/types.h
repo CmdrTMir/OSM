@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -12,13 +13,17 @@ static const int undefined_coordinate = 2147483647;
 static const int coordinate_precision = 10000000;
 using object_id_type = std::int64_t;
 
-// use geo? or change to double?
 struct Location {
   std::int32_t x_;
   std::int32_t y_;
   Location() : x_(undefined_coordinate), y_(undefined_coordinate) {}
   constexpr Location(const std::int32_t x, const std::int32_t y) noexcept
       : x_(x), y_(y) {}
+  static int32_t double_to_fix(const double c) noexcept {
+    return static_cast<int32_t>(std::round(c * coordinate_precision));
+  }
+  Location(const double lon, const double lat)
+      : x_(double_to_fix(lon)), y_(double_to_fix(lat)) {}
   constexpr std::int32_t x() const noexcept { return x_; }
   constexpr std::int32_t y() const noexcept { return y_; }
   Location& set_x(const std::int32_t x) noexcept {
@@ -34,6 +39,9 @@ struct Location {
            x_ <= 180 * coordinate_precision &&
            y_ >= -90 * coordinate_precision && y_ <= 90 * coordinate_precision;
   }
+  constexpr bool is_set() const noexcept {
+    return x_ != undefined_coordinate && y_ != undefined_coordinate;
+  }
   inline bool operator==(const Location& other_location) const {
     return x_ == other_location.x() && y_ == other_location.y();
   }
@@ -47,9 +55,6 @@ struct Location {
   inline bool operator>(const Location& other_location) const {
     return (other_location.x() == x_ && other_location.y() < y_) ||
            other_location.x() < x_;
-  }
-  bool is_there() const {
-    return x_ != undefined_coordinate && y_ != undefined_coordinate;
   }
 };
 

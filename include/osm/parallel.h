@@ -4,6 +4,7 @@
 
 #include "osm.h"
 #include "osm/decoder.h"
+#include "osm/hnidx/hybrid_node_index.h"
 #include "osm/inflate.h"
 #include "osm/lock_queue.h"
 #include "osm/memory.h"
@@ -54,8 +55,7 @@ void decode_primitive_parallel(
         auto local_nodes = std::make_shared<std::vector<osm::Node>>();
         auto on_node_local = [&](std::int64_t const id, geo::latlng const& pos,
                                  auto&& tags) {
-          osm::Location temp_loc{static_cast<int>(pos.lat()),
-                                 static_cast<int>(pos.lng())};
+          osm::Location temp_loc = osm::Location(pos.lat(), pos.lng());
           osm::Node temp_node{id, temp_loc};
           local_nodes->emplace_back(temp_node);
         };
@@ -94,6 +94,7 @@ void decode_primitive_parallel(
           ++next_expected;
         }
       }
+      node_index_builder.finish();
       std::cout << "this should be number of nodes: " << node_count
                 << std::endl;
       std::cout << "empty count: " << empty_node_count << " " << std::endl;
