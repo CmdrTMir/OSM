@@ -14,7 +14,7 @@ struct State {
   State() = delete;
   State(const State&) = delete;
   State& operator=(const State&) = delete;
-  explicit State(std::ostream& out, bool enable_debug = true)
+  explicit State(std::ostream* out, bool enable_debug = true)
       : problem_reporter(out), debug(enable_debug) {}
 
   bool debug;
