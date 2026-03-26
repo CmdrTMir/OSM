@@ -14,7 +14,7 @@ namespace assembler {
 struct assembly {
 
   State state_;
-  assembly() : state_(std::cout, true) {}
+  assembly() : state_(std::cout, false) {}
   // Definition of helper functions as members:
   uint32_t add_new_ring_complex(const slocation& node);
   std::uint32_t add_new_ring(const slocation& node);
@@ -362,7 +362,7 @@ struct assembly {
   bool assembling_area_from_relation(const osm::Relation<Members>& relation,
                                      const std::vector<const osm::Way*>& ways,
                                      polygon_area& out_buffer,
-                                     bool report_problems = true) {
+                                     bool report_problems = false) {
     // if (!config().create_new_style_polygons) {
     //   return true;
     // }
@@ -399,6 +399,12 @@ struct assembly {
                 << state_.segment_list.size() << " nodes\n";
     }
     const bool okay = create_area(out_buffer);
+    auto found_it = std::find(
+        state_.segment_list.relations_missing_ways.begin(),
+        state_.segment_list.relations_missing_ways.end(), relation.id);
+    if (found_it != state_.segment_list.relations_missing_ways.end()) {
+      out_buffer.missing_flag = true;
+    }
     return okay;
   }
 

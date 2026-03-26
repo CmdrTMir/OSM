@@ -6,6 +6,7 @@
 #include <list>
 #include <numeric>
 #include <set>
+#include <span>
 #include <unordered_set>
 #include <vector>
 
@@ -362,6 +363,7 @@ struct ProtoRing {
 
 struct SegmentList {
   std::vector<NodeRefSegment> segments_;
+  std::vector<osm::object_id_type> relations_missing_ways;
   /**
    * Calculate the number of segments in all the ways together.
    */
@@ -382,7 +384,7 @@ struct SegmentList {
                                           const osm::Way& way,
                                           role_type role) {
     uint32_t invalid_locations = 0;
-    auto previous_nr = osm::NodeRef{};
+    osm::NodeRef previous_nr;
     for (const osm::NodeRef& nr : way.nodes()) {
       if (!nr.location().valid()) {
         ++invalid_locations;
@@ -391,13 +393,15 @@ struct SegmentList {
         }
         continue;
       }
-      if (previous_nr.location() == nr.location()) {
-        segments_.emplace_back(previous_nr, nr, role, &way);
-      } else {
-        ++duplicate_nodes;
-        if (problem_reporter.report) {
-          problem_reporter.report_duplicate_node(previous_nr.ref(), nr.ref(),
-                                                 nr.location());
+      if (previous_nr.location().is_set()) {
+        if (previous_nr.location() != nr.location()) {
+          segments_.emplace_back(previous_nr, nr, role, &way);
+        } else {
+          ++duplicate_nodes;
+          if (problem_reporter.report) {
+            problem_reporter.report_duplicate_node(previous_nr.ref(), nr.ref(),
+                                                   nr.location());
+          }
         }
       }
       previous_nr = nr;
@@ -455,8 +459,6 @@ struct SegmentList {
   /**
    * Extract all segments from all ways that make up this
    * multipolygon relation and add them to the list.
-   * und hier ist der crash im if (ids.count((*way_it)->id) ==
-   * 0) iterator!!!
    */
   template <typename Members>
   uint32_t extract_segments_from_ways(
@@ -472,31 +474,39 @@ struct SegmentList {
     //   problem_reporter->set_nodes(num_segments);
     // }
     segments_.reserve(num_segments);
+    if (relation.id == 5197022) {
+      std::cout << "tracking id 5197022: " << ways.size() << std::endl;
+    }
 
     std::unordered_set<osm::object_id_type> ids;
     ids.reserve(ways.size());
     uint32_t invalid_locations = 0;
-    auto way_it = ways.cbegin();
-    for (const auto& [_, member_role, member_type] : relation.members()) {
+    auto way_not_found = 0;
+    for (const auto& [member_id, member_role, member_type] :
+         relation.members()) {
       if (member_type == osm::member_type::kWay) {
-        if (way_it == ways.cend()) {
-          std::cout << "way iter end reached! " << std::endl;
-          break;
-        }
-        // assert(way_it != ways.cend());
-        if (ids.count((*way_it)->id) == 0) {
-          ids.insert((*way_it)->id);
-          const auto role = parse_role(member_role.data());
-          invalid_locations += extract_segments_from_way_impl(
-              problem_reporter, duplicate_nodes, **way_it, role);
-        } else {
-          ++duplicate_ways;
-          if (problem_reporter.report) {
-            problem_reporter.report_duplicate_way(**way_it);
+        auto found_it = std::find_if(
+            ways.begin(), ways.end(),
+            [member_id](const osm::Way* w) { return w->id == member_id; });
+        if (found_it != ways.end()) {
+          if (ids.count((*found_it)->id) == 0) {
+            ids.insert((*found_it)->id);
+            const auto role = parse_role(member_role.data());
+            invalid_locations += extract_segments_from_way_impl(
+                problem_reporter, duplicate_nodes, **found_it, role);
+          } else {
+            ++duplicate_ways;
+            if (problem_reporter.report) {
+              problem_reporter.report_duplicate_way(**found_it);
+            }
           }
+        } else {
+          way_not_found++;
         }
-        ++way_it;
       }
+    }
+    if (way_not_found > 0) {
+      relations_missing_ways.push_back(relation.id);
     }
     return invalid_locations;
   }
@@ -511,6 +521,7 @@ struct SegmentList {
                                 uint64_t& duplicate_segments,
                                 uint64_t& overlapping_segments) {
     while (true) {
+      auto size = segments_.size();
       auto it = std::adjacent_find(segments_.begin(), segments_.end());
       if (it == segments_.end()) {
         break;
@@ -565,7 +576,7 @@ struct SegmentList {
         }
         if (y_range_overlap(s1, s2)) {
           const osm::Location intersection{calculate_intersection(s1, s2)};
-          if (intersection.is_there()) {
+          if (intersection.is_set()) {
             ++found_intersections;
             if (problem_reporter) {
               problem_reporter->report_intersection(
@@ -688,6 +699,7 @@ struct polygon_area {
   std::int64_t relation_id;
   bool valid = false;
   std::vector<area_pair> area;
+  bool missing_flag = false;
 
   explicit polygon_area(std::int64_t id) : relation_id(id) {}
 
