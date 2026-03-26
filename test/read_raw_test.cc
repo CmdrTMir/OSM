@@ -150,6 +150,7 @@ TEST(c, d) {
   // auto mp_vec = std::vector<osm::multi_polygon>{};
   // auto mp = osm::multi_polygon{};
   std::atomic_uint64_t relations_count2 = 0;
+  std::atomic_uint64_t relations_count = 0;
   std::atomic_uint64_t ways_count2 = 0;
   std::atomic_bool first = true;
   std::atomic_uint64_t worked_count = 0;
@@ -175,10 +176,12 @@ TEST(c, d) {
       [&](std::int64_t const id, geo::latlng const& pos, auto&& tags) {},
       [&](std::int64_t, auto&&, auto&&) { total_ways++; },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
+        relations_count++;
         osm::save_ways_of_relation(id, members, tags);
       },
       pt);
 
+  osm::reserve_way_map(total_ways);
   std::cout << " \t In the middle: " << std::endl;
 
   r.reset_reader();
