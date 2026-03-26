@@ -14,7 +14,8 @@ namespace assembler {
 struct assembly {
 
   State state_;
-  assembly() : state_(std::cout, false) {}
+  assembly(std::ostream* state = nullptr, bool flag = false)
+      : state_(state, flag) {}
   // Definition of helper functions as members:
   uint32_t add_new_ring_complex(const slocation& node);
   std::uint32_t add_new_ring(const slocation& node);
