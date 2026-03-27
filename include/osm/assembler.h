@@ -14,8 +14,8 @@ namespace assembler {
 struct assembly {
 
   State state_;
-  assembly(std::ostream* state = nullptr, bool flag = false)
-      : state_(state, flag) {}
+  assembly(std::ostream* state = nullptr, bool debug_flag = false)
+      : state_(state, debug_flag) {}
   // Definition of helper functions as members:
   uint32_t add_new_ring_complex(const slocation& node);
   std::uint32_t add_new_ring(const slocation& node);
@@ -244,9 +244,6 @@ struct assembly {
    */
   bool create_area(polygon_area& out_buffer) {
     const bool area_okay = create_rings();
-    // if (area_okay || state_.stats.create_empty_areas) {
-    //  builder.add_item(way.tags());
-    //}
     if (area_okay) {
       std::vector<area_pair> area;
       for (const ProtoRing& ring : state_.rings) {
@@ -274,46 +271,14 @@ struct assembly {
     return area_okay;  // || state_.stats.create_empty_areas;
   }
 
-  // template <typename Members>
-  // bool create_area_from_relation(std::vector<int>& out_buffer,
-  //                                const osm::Relation<Members>& relation,
-  //                                const std::vector<const osm::Way*>& members)
-  //                                {
-  //   set_num_members(members.size());
-  //   osm::AreaBuilder builder{out_buffer};
-  //   builder.initialize_from_object(relation);
-
-  //   const bool area_okay = create_rings();
-  //   if (area_okay || config().create_empty_areas) {
-  //     if (config().keep_type_tag) {
-  //       builder.add_item(relation.tags());
-  //     } else {
-  //       copy_tags_without_type(builder, relation.tags());
-  //     }
-  //   }
-  //   if (area_okay) {
-  //     add_rings_to_area(builder);
-  //   }
-
-  //   if (report_ways()) {
-  //     for (const osm::Way* way : members) {
-  //       config().problem_reporter->report_way(*way);
-  //     }
-  //   }
-
-  //   return area_okay || config().create_empty_areas;
-  // }
-
   /**
    * Assemble an area from the given way.
    * The resulting area is put into the out_buffer.
-   * Not used - added for completeness
+   * added for completeness
    * @returns false if there was some kind of error building the
    *          area, true otherwise.
    */
-  bool assembling_area_from_way(const osm::Way& way,
-                                polygon_area& out_buffer,
-                                bool report_problems = true) {
+  bool assembling_area_from_way(const osm::Way& way, polygon_area& out_buffer) {
     if (!state_.stats.create_way_polygons) {
       return true;
     }
@@ -325,11 +290,12 @@ struct assembly {
 
     if (!way.ends_have_same_id()) {
       ++state_.stats.duplicate_nodes;
-      if (report_problems) {
+      if (state_.problem_reporter.report) {
         state_.problem_reporter.report_duplicate_node(
             way.nodes().front().ref(), way.nodes().back().ref(),
             way.nodes().front().location());
       }
+      return false;  // hinzugefügt!
     }
 
     ++state_.stats.from_ways;
@@ -346,7 +312,7 @@ struct assembly {
     }
     const bool okay = create_area(out_buffer);
     if (state_.debug) {
-      std::cerr << "Done: " << std::endl;
+      std::cerr << "Done: " << way.id << std::endl;
       state_.stats.print_stats();
     }
     return okay;
@@ -362,18 +328,8 @@ struct assembly {
   template <typename Members>
   bool assembling_area_from_relation(const osm::Relation<Members>& relation,
                                      const std::vector<const osm::Way*>& ways,
-                                     polygon_area& out_buffer,
-                                     bool report_problems = false) {
-    // if (!config().create_new_style_polygons) {
-    //   return true;
-    // }
-
+                                     polygon_area& out_buffer) {
     assert(relation.members().size() >= ways.size());
-
-    // if (config().problem_reporter) {
-    //   config().problem_reporter->set_object(osm::item_type::relation,
-    //                                         relation.id);
-    // }
 
     if (relation.members().empty()) {
       ++state_.stats.no_way_in_mp_relation;
@@ -405,6 +361,10 @@ struct assembly {
         state_.segment_list.relations_missing_ways.end(), relation.id);
     if (found_it != state_.segment_list.relations_missing_ways.end()) {
       out_buffer.missing_flag = true;
+    }
+    if (state_.debug) {
+      std::cerr << "Done: " << relation.id << std::endl;
+      state_.stats.print_stats();
     }
     return okay;
   }

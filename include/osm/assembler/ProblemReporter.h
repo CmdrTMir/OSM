@@ -9,7 +9,8 @@ namespace assembler {
 struct ProblemReporter {
   bool report = false;
   std::ostream* out_stream_;
-  explicit ProblemReporter(std::ostream* out = nullptr) : out_stream_(out) {}
+  explicit ProblemReporter(std::ostream* out = nullptr, bool debug = false)
+      : out_stream_(out), report(debug) {}
 
   void header(const char* msg) {
     if (!out_stream_) return;

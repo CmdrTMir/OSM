@@ -700,6 +700,7 @@ struct polygon_area {
   bool valid = false;
   std::vector<area_pair> area;
   bool missing_flag = false;
+  bool from_way = false;
 
   explicit polygon_area(std::int64_t id) : relation_id(id) {}
 

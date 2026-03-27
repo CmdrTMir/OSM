@@ -33,7 +33,7 @@ inline NodeRefSegment* assembly::get_next_segment(
   return &state_.segment_list[it->item];
 }
 
-void remove_duplicates(std::vector<rings_stack_element>& outer_rings) {
+inline void remove_duplicates(std::vector<rings_stack_element>& outer_rings) {
   while (true) {
     const auto it = std::adjacent_find(outer_rings.begin(), outer_rings.end());
     if (it == outer_rings.end()) {
@@ -288,12 +288,12 @@ inline void assembly::find_inner_outer_complex() {
   }
 }
 
-void find_candidates(std::vector<candidate>& candidates,
-                     std::vector<osm::Location>& loc_done,
-                     const std::vector<location_to_ring_map>& xrings,
-                     const candidate& cand,
-                     unsigned depth = 0,
-                     bool debug = true) {
+inline void find_candidates(std::vector<candidate>& candidates,
+                            std::vector<osm::Location>& loc_done,
+                            const std::vector<location_to_ring_map>& xrings,
+                            const candidate& cand,
+                            unsigned depth = 0,
+                            bool debug = true) {
   if (depth > max_depth) {
     throw std::exception{};
   }
@@ -366,7 +366,7 @@ void find_candidates(std::vector<candidate>& candidates,
                     << " loc_done.size=" << loc_done.size() << ")\n";
         }
         loc_done.push_back(c.stop_location);
-        find_candidates(candidates, loc_done, xrings, c, depth + 1);
+        find_candidates(candidates, loc_done, xrings, c, depth + 1, debug);
         assert(!loc_done.empty() && loc_done.back() == c.stop_location);
         loc_done.pop_back();
         if (debug) {
@@ -420,7 +420,7 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
   std::vector<candidate> candidates;
 
   try {
-    find_candidates(candidates, loc_done, xrings, cand);
+    find_candidates(candidates, loc_done, xrings, cand, state_.debug);
   } catch (std::exception e) {
     if (state_.debug) {
       std::cerr << "Exceeded max depth (" << max_depth << ")\n";
@@ -434,7 +434,7 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
     }
     if (!open_ring_its.empty()) {
       std::cerr << "But open rings remain! \n";
-      // ++m_stats.open_rings;
+      ++state_.stats.open_rings;
       // if (m_config.problem_reporter) {
       //   for (auto& it : open_ring_its) {
       //     m_config.problem_reporter->report_ring_not_closed(
