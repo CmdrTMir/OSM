@@ -18,7 +18,7 @@
 #include "osm/osm.h"
 #include "osm/parallel.h"
 
-TEST(relation_tests, relation_areas) {
+TEST(relation_tests, functionality) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
                            cista::mmap::protection::READ}};
@@ -26,12 +26,6 @@ TEST(relation_tests, relation_areas) {
   auto bars = utl::global_progress_bars{false};
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
-
-  std::atomic_uint64_t relations_count2 = 0;
-  std::atomic_uint64_t worked_count = 0;
-  std::atomic_uint64_t cannot = 0;
-  std::atomic_uint64_t all_outer_rings = 0;
-  std::atomic_uint64_t all_innter_rings = 0;
 
   std::atomic<size_t> ways_processed{0};
   size_t total_ways = 0;
@@ -76,9 +70,6 @@ TEST(relation_tests, relation_areas) {
         osm::Way tempway{id, way_node_refs};
         tiles::update_locations_of_way(node_idx, tempway);
         auto area_result = mp_manager.save_ways(tempway, tags);
-        // if (area_result.has_value()) {
-        //  not set in this test
-        //}
         if (++ways_processed == total_ways) {
           std::lock_guard lock(rel_mutex);
           ways_done = true;
@@ -89,38 +80,20 @@ TEST(relation_tests, relation_areas) {
         std::unique_lock lock(rel_mutex);
         rel_cv.wait(lock, [&] { return ways_done; });
         lock.unlock();
-        relations_count2++;
         assembler::polygon_area p_area =
             mp_manager.assemble_area(id, members, tags);
         if (p_area.valid) {
-          worked_count++;
           std::cout << "AREA BUILT!"
                     << " num outer: " << p_area.get_all_outers().size()
                     << std::endl;
-          all_outer_rings += p_area.get_all_outers().size();
           auto inners = 0;
           for (size_t i = 0; i < p_area.area.size(); ++i) {
             auto outer = p_area.area[i].get_outer();
             inners += p_area.area[i].get_inners().size();
           }
           std::cout << " num all inners: " << inners << std::endl;
-          all_innter_rings += inners;
-        }
-        if (!p_area.valid && p_area.missing_flag == true) {
-          cannot++;
-          std::cout << "This realtion couldn't be assembled into an area, "
-                       "because ways are missing in the dataset: "
-                    << id << std::endl;
         }
         // 5197022 id die hier gebaut wird und in libosmium nicht! monaco
       },
       pt);
-
-  std::cout << "\t At the end: " << std::endl;
-  std::cout << "\t area count: " << worked_count
-            << "\t realtions count: " << relations_count2
-            << "\t ways_count: " << total_ways << std::endl;
-  std::cout << "\t all outer rings: " << all_outer_rings
-            << "\t all inner rings: " << all_innter_rings << std::endl;
-  std::cout << "\t couldn't assemble: " << cannot << std::endl;
 }

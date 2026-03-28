@@ -20,7 +20,7 @@
 
 #include "boost/fiber/all.hpp"
 
-TEST(way_tests, way_areas) {
+TEST(way_tests, way_areas_monaco) {
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
                            cista::mmap::protection::READ}};
@@ -29,20 +29,9 @@ TEST(way_tests, way_areas) {
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
 
-  // auto vec_mtx = std::mutex{};
-  // auto mp_vec = std::vector<osm::multi_polygon>{};
-  // auto mp = osm::multi_polygon{};
-  std::atomic_uint64_t relations_count2 = 0;
   std::atomic_uint64_t relations_count = 0;
-  std::atomic_uint64_t ways_count2 = 0;
-  std::atomic_bool first = true;
   std::atomic_uint64_t worked_count = 0;
-
-  std::atomic<size_t> ways_processed{0};
-  size_t total_ways = 0;
-  std::mutex rel_mutex;
-  std::condition_variable rel_cv;
-  bool ways_done = false;
+  std::atomic_uint64_t total_ways = 0;
   osm::PolygonManager mp_manager(true);
 
   auto tmp_dname = std::filesystem::temp_directory_path();
@@ -66,15 +55,13 @@ TEST(way_tests, way_areas) {
       pt);
 
   mp_manager.reserve_way_map(total_ways);
-  std::cout << " \t In the middle: " << std::endl;
-
   r.reset_reader();
+
   // PASS 2: areas
   osm::decode_primitive_parallel(
       r, node_idx_builder, false, true, true,
       [&](std::int64_t, geo::latlng const&, auto&&) {},
       [&](std::int64_t const id, auto&& refs, auto&& tags) {
-        ways_count2++;
         std::vector<osm::NodeRef> way_node_refs;
         std::int64_t acc = 0;
         for (auto r : refs) {
@@ -85,25 +72,19 @@ TEST(way_tests, way_areas) {
         tiles::update_locations_of_way(node_idx, tempway);
         auto area_result = mp_manager.save_ways(tempway, tags);
         if (area_result.has_value()) {
+          worked_count++;
           // Do something with from way polygon
           const auto& area = area_result.value();  // or *result
         }
-        if (++ways_processed == total_ways) {
-          std::lock_guard lock(rel_mutex);
-          ways_done = true;
-          rel_cv.notify_all();
-        }
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
-        std::unique_lock lock(rel_mutex);
-        rel_cv.wait(lock, [&] { return ways_done; });
-        lock.unlock();
-        relations_count2++;
-        // do nothing -> this is the way test
+        // do nothing -> this is the way area test
       },
       pt);
 
-  std::cout << " \t At the end: " << std::endl;
-  std::cout << " \t area count " << worked_count << "/" << relations_count2
-            << " (realtions2) \n \t ways_count: " << ways_count2 << std::endl;
+  std::cout << " \t Results: " << std::endl;
+  std::cout << " \t number of read ways: " << total_ways << std::endl;
+  EXPECT_EQ(total_ways, 6180);
+  std::cout << " \t check area count: " << worked_count << std::endl;
+  EXPECT_EQ(worked_count, 2099);
 }

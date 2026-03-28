@@ -95,18 +95,13 @@ void decode_primitive_parallel(
         }
       }
       node_index_builder.finish();
-      std::cout << "this should be number of nodes: " << node_count
-                << std::endl;
-      std::cout << "empty count: " << empty_node_count << " " << std::endl;
-      std::cout << "last node block should be: "
-                << next_block_id - empty_node_count << std::endl;
+      std::cout << "number of nodes: " << node_count << std::endl;
       r.set_offset(next_block_id - empty_node_count);
     }
   });
 
   auto buf = std::optional<osm::buf>{};
   int num = 0;
-  std::cout << "r.offset() is " << r.get_offset() << std::endl;
   while ((buf = r.read()).has_value()) {
     int count = next_block_id++;
     if (count < r.get_offset() && !read_nodes) {
@@ -120,7 +115,6 @@ void decode_primitive_parallel(
     pt->update(r.file_.size() - r.rest_.size());
   }
   prod_queue.set_done();
-  std::cout << "A: number: " << num << std::endl;
 
   for (auto& t : pool) {
     t.join();

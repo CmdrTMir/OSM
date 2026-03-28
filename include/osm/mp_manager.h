@@ -125,18 +125,13 @@ struct PolygonManager {
     return ptrs;
   }
 
-  int cannot = 0;
-  int last = 0;
-
   template <typename Members, typename Tags>
   assembler::polygon_area assemble_area(std::int64_t const id,
                                         Members&& members,
-                                        Tags&& tags,
-                                        int count) {
-    last++;
+                                        Tags&& tags) {
     if (first) {
-      std::cout << "vectorsize: " << mp_vec_.size()
-                << " not areas: " << count_non_areas << std::endl;
+      std::cout << "possible areas: " << mp_vec_.size()
+                << " --- not areas: " << count_non_areas << std::endl;
       first = false;
     }
     assembler::polygon_area a(id);
@@ -153,20 +148,8 @@ struct PolygonManager {
         break;
       }
     }
+    // make void?
     worked = assemble.assembling_area_from_relation(r, ways, a);
-    if (!a.valid && a.missing_flag == true) {
-      cannot++;
-      // std::cout
-      //<< "This realtion couldn't be assembled into an area, because ways "
-      //    "are missing in the dataset: "
-      //  << id << std::endl;
-    }
-    // 5197022 id die hier gebaut wird und in libosmium nicht! monaco
-
-    if (last == count) {
-      std::cout << "couldn't assemble: " << cannot << std::endl;
-    }
-    //  add (way.tags()) to area ?
     return a;
   }
 };  // struct PolygonManager

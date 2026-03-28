@@ -696,13 +696,13 @@ struct area_pair {
 };
 
 struct polygon_area {
-  std::int64_t relation_id;
+  std::int64_t origin_id;
   bool valid = false;
   std::vector<area_pair> area;
   bool missing_flag = false;
   bool from_way = false;
 
-  explicit polygon_area(std::int64_t id) : relation_id(id) {}
+  explicit polygon_area(std::int64_t id) : origin_id(id) {}
 
   std::vector<std::span<const osm::NodeRef>> get_all_outers() {
     std::vector<std::span<const osm::NodeRef>> result;
@@ -712,11 +712,12 @@ struct polygon_area {
     return result;
   }
 
-  std::vector<std::span<const osm::NodeRef>> get_all_inners_as_vec(
+  std::vector<std::span<const osm::NodeRef>> get_inners_seperated(
       std::size_t outer_index) {
     std::vector<std::span<const osm::NodeRef>> result;
     if (outer_index >= area.size()) return result;
     auto const& ap = area[outer_index];
+    result.reserve(ap.offsets.size() - 1);
     for (std::size_t i = 0; i + 1 < ap.offsets.size(); ++i) {
       result.push_back(ap.get_inner_at(i));
     }
