@@ -179,8 +179,7 @@ struct assembly {
     // If the assembler was so configured, now check whether the
     // member roles are correctly tagged. --> check always
     // check_inner_outer_roles:
-    // if (state_.debug) {
-    if (false) {
+    if (state_.debug) {
       std::cerr << "    Checking inner/outer roles\n";
 
       int count_segments_for_debug = 0;
@@ -247,20 +246,21 @@ struct assembly {
     if (area_okay) {
       std::vector<area_pair> area;
       for (const ProtoRing& ring : state_.rings) {
+        if (!ring.is_outer()) {
+          continue;
+        }
         std::vector<osm::NodeRef> area_part;
         std::vector<std::int64_t> offsets;
-        if (ring.is_outer()) {
+        offsets.push_back(area_part.size());
+        area_part.emplace_back(ring.get_node_ref_start());
+        for (const auto& segment : ring.segments()) {
+          area_part.emplace_back(segment->stop());
+        }
+        for (const ProtoRing* inner : ring.inner_rings()) {
           offsets.push_back(area_part.size());
-          area_part.emplace_back(ring.get_node_ref_start());
-          for (const auto& segment : ring.segments()) {
+          area_part.emplace_back(inner->get_node_ref_start());
+          for (const auto& segment : inner->segments()) {
             area_part.emplace_back(segment->stop());
-          }
-          for (const ProtoRing* inner : ring.inner_rings()) {
-            offsets.push_back(area_part.size());
-            area_part.emplace_back(inner->get_node_ref_start());
-            for (const auto& segment : inner->segments()) {
-              area_part.emplace_back(segment->stop());
-            }
           }
         }
         area.emplace_back(area_part, offsets);
@@ -268,7 +268,7 @@ struct assembly {
       out_buffer.valid = area_okay;
       out_buffer.area = std::move(area);
     }
-    return area_okay;  // || state_.stats.create_empty_areas;
+    return area_okay;
   }
 
   /**
@@ -361,6 +361,9 @@ struct assembly {
         state_.segment_list.relations_missing_ways.end(), relation.id);
     if (found_it != state_.segment_list.relations_missing_ways.end()) {
       out_buffer.missing_flag = true;
+    }
+    if (okay) {
+      out_buffer.pa_stats = state_.stats;
     }
     if (state_.debug) {
       std::cerr << "Done: " << relation.id << std::endl;

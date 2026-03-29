@@ -6,6 +6,7 @@
 
 #include "osm/assembler.h"
 #include "osm/assembler/assemble_rings.h"
+#include "osm/assembler/assembler_stats.h"
 #include "osm/assembler/assembler_types.h"
 #include "osm/decoder.h"
 
@@ -17,8 +18,8 @@ struct multi_polygon {
 };
 
 struct PolygonManager {
-
-  bool first = true;
+  std::mutex stats_mtx;
+  assembler::area_stats all_stats{};
   bool assemble_way_polygons_ = false;
   std::mutex mp_vec_mtx;
   std::vector<osm::multi_polygon> mp_vec_ = std::vector<osm::multi_polygon>{};
@@ -129,11 +130,6 @@ struct PolygonManager {
   assembler::polygon_area assemble_area(std::int64_t const id,
                                         Members&& members,
                                         Tags&& tags) {
-    if (first) {
-      std::cout << "possible areas: " << mp_vec_.size()
-                << " --- not areas: " << count_non_areas << std::endl;
-      first = false;
-    }
     assembler::polygon_area a(id);
     if (!is_area(tags)) {
       return a;
@@ -148,8 +144,11 @@ struct PolygonManager {
         break;
       }
     }
-    // make void?
     worked = assemble.assembling_area_from_relation(r, ways, a);
+    {
+      std::lock_guard<std::mutex> lock(stats_mtx);
+      all_stats += a.pa_stats;
+    }
     return a;
   }
 };  // struct PolygonManager
