@@ -31,7 +31,7 @@ TEST(relation_tests, relation_areas) {
   std::atomic_uint64_t worked_count = 0;
   std::atomic_uint64_t cannot = 0;
   std::atomic_uint64_t all_outer_rings = 0;
-  std::atomic_uint64_t all_innter_rings = 0;
+  std::atomic_uint64_t all_inner_rings = 0;
 
   std::atomic<size_t> ways_processed{0};
   size_t total_ways = 0;
@@ -94,33 +94,29 @@ TEST(relation_tests, relation_areas) {
             mp_manager.assemble_area(id, members, tags);
         if (p_area.valid) {
           worked_count++;
-          std::cout << "AREA BUILT!"
-                    << " num outer: " << p_area.get_all_outers().size()
-                    << std::endl;
           all_outer_rings += p_area.get_all_outers().size();
           auto inners = 0;
           for (size_t i = 0; i < p_area.area.size(); ++i) {
-            auto outer = p_area.area[i].get_outer();
-            inners += p_area.area[i].get_inners().size();
+            inners += p_area.area[i].offsets.size() - 1;
           }
-          std::cout << " num all inners: " << inners << std::endl;
-          all_innter_rings += inners;
+          all_inner_rings += inners;
         }
         if (!p_area.valid && p_area.missing_flag == true) {
           cannot++;
-          std::cout << "This realtion couldn't be assembled into an area, "
-                       "because ways are missing in the dataset: "
-                    << id << std::endl;
+          // std::cout << "This realtion couldn't be assembled into an area, "
+          //             "because ways are missing in the dataset: "
+          //           << id << std::endl;
         }
-        // 5197022 id die hier gebaut wird und in libosmium nicht! monaco
       },
       pt);
 
   std::cout << "\t At the end: " << std::endl;
+  std::cout << "\t possible areas: " << mp_manager.mp_vec_.size()
+            << "\t non areas: " << mp_manager.count_non_areas << std::endl;
   std::cout << "\t area count: " << worked_count
             << "\t realtions count: " << relations_count2
             << "\t ways_count: " << total_ways << std::endl;
   std::cout << "\t all outer rings: " << all_outer_rings
-            << "\t all inner rings: " << all_innter_rings << std::endl;
+            << "\t all inner rings: " << all_inner_rings << std::endl;
   std::cout << "\t couldn't assemble: " << cannot << std::endl;
 }
