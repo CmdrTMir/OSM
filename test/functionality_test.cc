@@ -84,11 +84,28 @@ inline double compute_area(const std::vector<Point>& ring) {
 inline bool point_in_polygon(const Point& pt, const std::vector<Point>& ring) {
   auto inside = false;
   auto n = ring.size();
+  const double eps = 1e-12;
   for (size_t i = 0, j = n - 1; i < n; j = i++) {
     const auto& pi = ring[i];
     const auto& pj = ring[j];
+    // --- Check: point on edge ---
+    double minx = std::min(pi.x, pj.x) - eps;
+    double maxx = std::max(pi.x, pj.x) + eps;
+    double miny = std::min(pi.y, pj.y) - eps;
+    double maxy = std::max(pi.y, pj.y) + eps;
+    double dx = pj.x - pi.x;
+    double dy = pj.y - pi.y;
+    if (std::abs(dx) < eps && std::abs(dy) < eps) continue;  // not real segment
+    double cross = (pt.x - pi.x) * dy - (pt.y - pi.y) * dx;
+    if (std::abs(cross) < eps && pt.x >= minx && pt.x <= maxx && pt.y >= miny &&
+        pt.y <= maxy) {
+      // happens in cases with "ways_in_multiple_rings",
+      // when inner and outer share a way
+      return true;  // point on edge = inside
+    }
+    // --- classic ray casting ---
     if (((pi.y > pt.y) != (pj.y > pt.y)) &&
-        (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y + 1e-12) + pi.x)) {
+        (pt.x < (pj.x - pi.x) * (pt.y - pi.y) / (pj.y - pi.y + eps) + pi.x)) {
       inside = !inside;
     }
   }
@@ -97,7 +114,7 @@ inline bool point_in_polygon(const Point& pt, const std::vector<Point>& ring) {
 
 TEST(relation_tests, functionality) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
