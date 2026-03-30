@@ -293,7 +293,7 @@ inline void find_candidates(std::vector<candidate>& candidates,
                             const std::vector<location_to_ring_map>& xrings,
                             const candidate& cand,
                             unsigned depth = 0,
-                            bool debug = true) {
+                            bool debug = false) {
   if (depth > max_depth) {
     throw std::exception{};
   }

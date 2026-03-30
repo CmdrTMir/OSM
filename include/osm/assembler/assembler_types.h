@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "ProblemReporter.h"
+#include "assembler_stats.h"
 #include "osm/types.h"
 #include "vec.h"
 
@@ -474,9 +475,6 @@ struct SegmentList {
     //   problem_reporter->set_nodes(num_segments);
     // }
     segments_.reserve(num_segments);
-    if (relation.id == 5197022) {
-      std::cout << "tracking id 5197022: " << ways.size() << std::endl;
-    }
 
     std::unordered_set<osm::object_id_type> ids;
     ids.reserve(ways.size());
@@ -701,6 +699,8 @@ struct polygon_area {
   std::vector<area_pair> area;
   bool missing_flag = false;
   bool from_way = false;
+
+  assembler::area_stats pa_stats{};
 
   explicit polygon_area(std::int64_t id) : origin_id(id) {}
 
