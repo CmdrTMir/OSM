@@ -55,16 +55,16 @@ struct PolygonManager {
       // area indicator (implicit)
       if (key == "building" || key == "landuse" || key == "natural" ||
           key == "amenity" || key == "leisure" || key == "tourism" ||
-          key == "waterway" && value == "riverbank" ||
-          key == "waterway" && value == "dock" ||
-          key == "power" && (value == "plant" || value == "substation")) {
+          (key == "waterway" && value == "riverbank") ||
+          (key == "waterway" && value == "dock") ||
+          (key == "power" && (value == "plant" || value == "substation"))) {
         has_area_indicator = true;
         continue;
       }
       // line indicator overrides area indicator
       if (key == "highway" || key == "railway" ||
           (key == "waterway" && value != "riverbank" && value != "dock") ||
-          key == "barrier" || (key == "man_made" && value == "pier")) {
+          (key == "barrier" || (key == "man_made" && value == "pier"))) {
         has_line_indicator = true;
       }
     }
@@ -102,7 +102,8 @@ struct PolygonManager {
       std::lock_guard<std::mutex> lock(ways_vec_mtx);
       all_ways_.insert({way.id, way});
     }
-    if (assemble_way_polygons_ && is_way_area(tags)) {
+    // for the more defensive version, include is_way_area check.
+    if (assemble_way_polygons_) {  // && is_way_area(tags)) {
       assembler::polygon_area a(way.id);
       a.from_way = true;
       assembler::assembly assemble = assembler::assembly{};

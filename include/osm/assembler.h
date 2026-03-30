@@ -181,52 +181,51 @@ struct assembly {
     // check_inner_outer_roles:
     if (state_.debug) {
       std::cerr << "    Checking inner/outer roles\n";
-
-      int count_segments_for_debug = 0;
-      std::unordered_map<const osm::Way*, const ProtoRing*> way_rings;
-      std::unordered_set<const osm::Way*> ways_in_multiple_rings;
-      for (const ProtoRing& ring : state_.rings) {
-        for (const auto& segment : ring.segments()) {
-          count_segments_for_debug++;
-          assert(segment->way());
-          if (!segment->role_empty() &&
-              (ring.is_outer() ? !segment->role_outer()
-                               : !segment->role_inner())) {
-            ++state_.stats.wrong_role;
-            if (state_.debug) {
-              std::cerr << " Segment: " << count_segments_for_debug
-                        << " from way " << segment->way()->id << " has role '"
-                        << segment->role_name() << "', but should have role '"
-                        << (ring.is_outer() ? "outer" : "inner") << "'\n ";
-            }
-            if (ring.is_outer()) {
-              state_.problem_reporter.report_role_should_be_outer(
-                  segment->way()->id, segment->first().location(),
-                  segment->second().location());
-            } else {
-              state_.problem_reporter.report_role_should_be_inner(
-                  segment->way()->id, segment->first().location(),
-                  segment->second().location());
-            }
+    }
+    int count_segments_for_debug = 0;
+    std::unordered_map<const osm::Way*, const ProtoRing*> way_rings;
+    std::unordered_set<const osm::Way*> ways_in_multiple_rings;
+    for (const ProtoRing& ring : state_.rings) {
+      for (const auto& segment : ring.segments()) {
+        count_segments_for_debug++;
+        assert(segment->way());
+        if (!segment->role_empty() &&
+            (ring.is_outer() ? !segment->role_outer()
+                             : !segment->role_inner())) {
+          ++state_.stats.wrong_role;
+          if (state_.debug) {
+            std::cerr << " Segment: " << count_segments_for_debug
+                      << " from way " << segment->way()->id << " has role '"
+                      << segment->role_name() << "', but should have role '"
+                      << (ring.is_outer() ? "outer" : "inner") << "'\n ";
           }
-          auto& r = way_rings[segment->way()];
-          if (!r) {
-            r = &ring;
-          } else if (r != &ring) {
-            ways_in_multiple_rings.insert(segment->way());
+          if (ring.is_outer()) {
+            state_.problem_reporter.report_role_should_be_outer(
+                segment->way()->id, segment->first().location(),
+                segment->second().location());
+          } else {
+            state_.problem_reporter.report_role_should_be_inner(
+                segment->way()->id, segment->first().location(),
+                segment->second().location());
           }
         }
-        count_segments_for_debug = 0;
-      }
-      for (const osm::Way* way :
-           ways_in_multiple_rings) {  // NOLINT(bugprone - nondeterministic -
-                                      // pointer - iteration - order)
-        ++state_.stats.ways_in_multiple_rings;
-        if (state_.debug) {
-          std::cerr << " Way " << way->id << " is in multiple rings\n ";
+        auto& r = way_rings[segment->way()];
+        if (!r) {
+          r = &ring;
+        } else if (r != &ring) {
+          ways_in_multiple_rings.insert(segment->way());
         }
-        state_.problem_reporter.report_way_in_multiple_rings(*way);
       }
+      count_segments_for_debug = 0;
+    }
+    for (const osm::Way* way :
+         ways_in_multiple_rings) {  // NOLINT(bugprone - nondeterministic -
+                                    // pointer - iteration - order)
+      ++state_.stats.ways_in_multiple_rings;
+      if (state_.debug) {
+        std::cerr << " Way " << way->id << " is in multiple rings\n ";
+      }
+      state_.problem_reporter.report_way_in_multiple_rings(*way);
     }
     // check_inner_outer_roles - finished
 
@@ -279,9 +278,6 @@ struct assembly {
    *          area, true otherwise.
    */
   bool assembling_area_from_way(const osm::Way& way, polygon_area& out_buffer) {
-    if (!state_.stats.create_way_polygons) {
-      return true;
-    }
     // Ignore (but count) ways without segments.
     if (way.nodes().size() < 2) {
       ++state_.stats.short_ways;
@@ -295,7 +291,6 @@ struct assembly {
             way.nodes().front().ref(), way.nodes().back().ref(),
             way.nodes().front().location());
       }
-      return false;  // hinzugefügt!
     }
 
     ++state_.stats.from_ways;
