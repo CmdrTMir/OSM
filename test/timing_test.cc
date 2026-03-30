@@ -16,27 +16,25 @@
 #include "osm/osm.h"
 #include "osm/parallel.h"
 
-TEST(relation_tests, relation_areas) {
+#include "boost/fiber/all.hpp"
+
+TEST(timing, test) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/germany-latest.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
   auto pt = utl::activate_progress_tracker("parse");
   pt->in_high(r.rest_.size());
 
-  std::atomic_uint64_t relations_count2 = 0;
+  std::atomic_uint64_t relations_count = 0;
   std::atomic_uint64_t worked_count = 0;
-  std::atomic_uint64_t cannot = 0;
-  std::atomic_uint64_t all_outer_rings = 0;
-  std::atomic_uint64_t all_inner_rings = 0;
-
+  std::atomic_uint64_t total_ways = 0;
+  osm::PolygonManager mp_manager(false);
   std::atomic<size_t> ways_processed{0};
-  size_t total_ways = 0;
+  bool ways_done = false;
   std::mutex rel_mutex;
   std::condition_variable rel_cv;
-  bool ways_done = false;
-  osm::PolygonManager mp_manager(false);
 
   auto tmp_dname = std::filesystem::temp_directory_path();
   auto const node_idx_file = tiles::tmp_file{
@@ -47,6 +45,7 @@ TEST(relation_tests, relation_areas) {
                                   node_dat_file.fileno()};
   tiles::hybrid_node_idx_builder node_idx_builder{node_idx};
 
+  auto start1 = std::chrono::high_resolution_clock::now();
   //   PASS 1: nodes & ways
   osm::decode_primitive_parallel(
       r, node_idx_builder, true, true, true,
@@ -56,10 +55,14 @@ TEST(relation_tests, relation_areas) {
         mp_manager.save_ways_of_relation(id, members, tags);
       },
       pt);
+  auto end1 = std::chrono::high_resolution_clock::now();
+  auto duration_pass1 =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
 
   mp_manager.reserve_way_map(total_ways);
   r.reset_reader();
 
+  auto start2 = std::chrono::high_resolution_clock::now();
   // PASS 2: areas
   osm::decode_primitive_parallel(
       r, node_idx_builder, false, true, true,
@@ -74,9 +77,6 @@ TEST(relation_tests, relation_areas) {
         osm::Way tempway{id, way_node_refs};
         tiles::update_locations_of_way(node_idx, tempway);
         auto area_result = mp_manager.save_ways(tempway, tags);
-        // if (area_result.has_value()) {
-        //  not set in this test
-        //}
         if (++ways_processed == total_ways) {
           std::lock_guard lock(rel_mutex);
           ways_done = true;
@@ -87,36 +87,13 @@ TEST(relation_tests, relation_areas) {
         std::unique_lock lock(rel_mutex);
         rel_cv.wait(lock, [&] { return ways_done; });
         lock.unlock();
-        relations_count2++;
         assembler::polygon_area p_area =
             mp_manager.assemble_area(id, members, tags);
-        if (p_area.valid) {
-          worked_count++;
-          all_outer_rings += p_area.get_all_outers().size();
-          auto inners = 0;
-          for (size_t i = 0; i < p_area.area.size(); ++i) {
-            inners += p_area.area[i].offsets.size() - 1;
-          }
-          all_inner_rings += inners;
-        }
-        if (!p_area.valid && p_area.missing_flag == true) {
-          cannot++;
-          std::cout << "This realtion couldn't be assembled into an area, "
-                       "because ways are missing in the dataset: "
-                    << id << std::endl;
-        }
       },
       pt);
-
-  std::cout << "\t At the end: " << std::endl;
-  std::cout << "\t possible areas: " << mp_manager.mp_vec_.size()
-            << "\t non areas: " << mp_manager.count_non_areas << std::endl;
-  std::cout << "\t area count: " << worked_count
-            << "\t realtions count: " << relations_count2
-            << "\t ways_count: " << total_ways << std::endl;
-  std::cout << "\t all outer rings: " << all_outer_rings
-            << "\t all inner rings: " << all_inner_rings << std::endl;
-  std::cout << "\t couldn't assemble: " << cannot << std::endl;
-
-  mp_manager.all_stats.print_stats();
+  auto end2 = std::chrono::high_resolution_clock::now();
+  auto duration_pass2 =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
+  std::cout << "\t Duration Pass1: " << duration_pass1.count()
+            << "\t Duration Pass2: " << duration_pass2.count() << std::endl;
 }

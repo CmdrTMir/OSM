@@ -20,7 +20,69 @@
 
 #include "boost/fiber/all.hpp"
 
+// --- makes helper functions more readable ---
+struct Point {
+  std::int64_t x, y;
+};
+
+// convert std::span<const NodeRef> into std::vector<Point>
+inline std::vector<Point> span_to_points(std::span<const osm::NodeRef> span) {
+  std::vector<Point> pts;
+  pts.reserve(span.size());
+  for (const auto& n : span) {
+    pts.push_back({n.location().x(), n.location().y()});
+  }
+  return pts;
+}
+
+// --- 1. Check: is ring closed ---
+inline bool is_closed(const std::vector<Point>& ring) {
+  if (ring.size() < 4) return false;
+  return std::abs(ring.front().x - ring.back().x) < 1e-9 &&
+         std::abs(ring.front().y - ring.back().y) < 1e-9;
+}
+
+// --- 2. Check: no self intersections ---
+inline bool segments_intersect(const Point& a,
+                               const Point& b,
+                               const Point& c,
+                               const Point& d) {
+  auto cross = [](const Point& p0, const Point& p1, const Point& p2) {
+    return (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+  };
+  auto ccw = [&](const Point& p0, const Point& p1, const Point& p2) {
+    return cross(p0, p1, p2) > 0;
+  };
+  return (ccw(a, c, d) != ccw(b, c, d)) && (ccw(a, b, c) != ccw(a, b, d));
+}
+inline bool no_self_intersections(const std::vector<Point>& ring) {
+  auto n = ring.size();
+  if (n < 4) return true;  // trivial
+  for (auto i = 0; i < n - 1; ++i) {
+    for (auto j = i + 1; j < n - 1; ++j) {
+      // ignore neighbouring segments
+      if (std::abs((int)i - (int)j) <= 1) continue;
+      if (i == 0 && j == n - 2) continue;  // first and last segment point
+      if (segments_intersect(ring[i], ring[i + 1], ring[j], ring[j + 1])) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// --- 3. Check: area > 0 (Shoelace formula) ---
+inline double compute_area(const std::vector<Point>& ring) {
+  auto sum = 0.0;
+  auto n = ring.size();
+  for (auto i = 0; i < n - 1; ++i) {
+    sum += ring[i].x * ring[i + 1].y - ring[i + 1].x * ring[i].y;
+  }
+  return std::abs(sum) / 2.0;
+}
+
 TEST(way_tests, way_areas_monaco) {
+  // Dieser Test beruht auf dem monaco-260324.osm.pbf file
   auto r = osm::raw_reader{
       .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
                            cista::mmap::protection::READ}};
@@ -73,8 +135,22 @@ TEST(way_tests, way_areas_monaco) {
         auto area_result = mp_manager.save_ways(tempway, tags);
         if (area_result.has_value()) {
           worked_count++;
-          // Do something with from way polygon
-          const auto& area = area_result.value();  // or *result
+          const auto& poly = area_result.value();
+          // =========== IS GEOMETRY RIGHT =========================
+          for (size_t i = 0; i < poly.area.size(); ++i) {
+            const auto& ap = poly.area[i];
+            auto outer_pts = span_to_points(ap.get_outer());
+            // check 1.
+            EXPECT_TRUE(is_closed(outer_pts))
+                << "Outer ring " << i << " is not closed, for id: " << id;
+            // check 2.
+            EXPECT_TRUE(no_self_intersections(outer_pts))
+                << "Outer ring " << i << " self-intersects, for id: " << id;
+            // check 3.
+            EXPECT_GT(compute_area(outer_pts), 0.0)
+                << "Outer ring " << i << " has zero area, for id: " << id;
+          }
+          // ========================================================
         }
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {

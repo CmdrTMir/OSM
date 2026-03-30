@@ -97,7 +97,7 @@ inline bool point_in_polygon(const Point& pt, const std::vector<Point>& ring) {
 
 TEST(relation_tests, functionality) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/liechtenstein-260324.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
@@ -181,6 +181,12 @@ TEST(relation_tests, functionality) {
           for (size_t j = 0; j + 1 < ap.offsets.size(); ++j) {
             auto inner_pts = span_to_points(ap.get_inner_at(j));
             if (inner_pts.empty()) continue;
+            EXPECT_TRUE(is_closed(inner_pts))
+                << "Inner ring " << j << " is not closed, for id: " << id;
+            EXPECT_TRUE(no_self_intersections(inner_pts))
+                << "Inner ring " << j << " self-intersects, for id: " << id;
+            EXPECT_GT(compute_area(inner_pts), 0.0)
+                << "Inner ring " << j << " has zero area, for id: " << id;
             for (const auto& p : inner_pts) {
               EXPECT_TRUE(point_in_polygon(p, outer_pts))
                   << "Inner ring " << j << " is outside outer ring " << i
@@ -200,15 +206,10 @@ TEST(relation_tests, functionality) {
             EXPECT_GT(p_area.get_all_outers().size(), 0);
             auto inners = 0;
             for (size_t i = 0; i < p_area.area.size(); ++i) {
-              // std::cout << "area_pair " << i << ": offsets.size() = "
-              //           << p_area.area[i].offsets.size()
-              //           << ", area_part.size() = "
-              //           << p_area.area[i].area_part.size() << std::endl;
               auto outer = p_area.area[i].get_outer();
               EXPECT_FALSE(outer.empty()) << "Outer " << i << " is empty";
               inners += p_area.area[i].get_inners().size();
             }
-            // std::cout << " num all inners: " << inners << std::endl;
           }
         } else {
           EXPECT_FALSE(p_area.valid);
@@ -218,7 +219,7 @@ TEST(relation_tests, functionality) {
       },
       pt);
 
-  // mp_manager.all_stats.print_stats();
+  mp_manager.all_stats.print_stats();
 
   std::cout << std::endl;
   std::cout << "not built: " << not_built << std::endl;
