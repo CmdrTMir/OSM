@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -26,6 +27,7 @@ struct Location {
       : x_(double_to_fix(lon)), y_(double_to_fix(lat)) {}
   constexpr std::int32_t x() const noexcept { return x_; }
   constexpr std::int32_t y() const noexcept { return y_; }
+
   Location& set_x(const std::int32_t x) noexcept {
     x_ = x;
     return *this;
@@ -89,7 +91,6 @@ struct Way {
   }
 };
 
-// NICHT SICHER
 template <typename Members>
 struct Relation {
   object_id_type id;

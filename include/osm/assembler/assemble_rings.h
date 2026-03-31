@@ -10,11 +10,11 @@
 #include "osm/types.h"
 
 namespace assembler {
-//
+
 /*
- *HELPER FUNCTIONS
+ *  helper functions:
  */
-//
+
 inline NodeRefSegment* assembly::get_next_segment(
     const osm::Location& location) {
   auto it = std::lower_bound(
@@ -303,10 +303,6 @@ inline void find_candidates(std::vector<candidate>& candidates,
               << " start=" << cand.start_location.x() << ","
               << cand.start_location.y() << " stop=" << cand.stop_location.x()
               << "," << cand.stop_location.y() << "\n";
-    // for (const auto& ring : cand.rings) {
-    //   std::cerr << "        " << ring.first.ring()
-    //             << (ring.second ? " reverse" : "") << "\n";
-    // }
   }
 
   const auto connections =
@@ -322,8 +318,9 @@ inline void find_candidates(std::vector<candidate>& candidates,
 
     if (&ring != ring_leading_here) {
       // if (debug) {
-      //   std::cerr << "        next possible connection: " << ring
-      //             << (m.start ? "" : " reverse") << "\n";
+      //   std::cerr << "        next possible connection: ";
+      //   ring.print(std::cerr);
+      //   std::cerr << (m.start ? "" : " reverse") << "\n";
       // }
 
       candidate c = cand;
@@ -378,7 +375,7 @@ inline void find_candidates(std::vector<candidate>& candidates,
     }
   }
 }
-// END: HELPER FUNCTIONS
+// helper functions end
 
 /**
  * If there are multiple open rings and multiple ways to join them,
@@ -435,7 +432,7 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
     if (!open_ring_its.empty()) {
       std::cerr << "But open rings remain! \n";
       ++state_.stats.open_rings;
-      // if (m_config.problem_reporter) {
+      // if (problem_reporter.report) {
       //   for (auto& it : open_ring_its) {
       //     m_config.problem_reporter->report_ring_not_closed(
       //         it->get_node_ref_start(), nullptr);
@@ -452,8 +449,9 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
     for (const auto& c : candidates) {
       std::cerr << "      sum=" << c.sum << "\n";
       // for (const auto& ring : c.rings) {
-      //   std::cerr << "        " << ring.first.ring()
-      //             << (ring.second ? " reverse" : "") << "\n";
+      //   std::cerr << "        ";
+      //   ring.first.ring().print(std::cerr);
+      //   std::cerr << (ring.second ? " reverse" : "") << "\n";
       // }
     }
   }
@@ -465,8 +463,9 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
   if (state_.debug) {
     std::cerr << "    Decided on: sum=" << chosen_cand.sum << "\n";
     // for (const auto& ring : chosen_cand.rings) {
-    //   std::cerr << "        " << ring.first.ring()
-    //             << (ring.second ? " reverse" : "") << "\n";
+    //   std::cerr << "        ";
+    //   ring.first.ring().print(std::cerr);
+    //   std::cerr << (ring.second ? " reverse" : "") << "\n";
     // }
   }
 
@@ -480,7 +479,9 @@ inline bool assembly::join_connected_rings(open_ring_its_type& open_ring_its) {
   }
 
   if (state_.debug) {
-    std::cerr << "    Merged to " << std::endl;  // remaining_ring << '\n';
+    std::cerr << "    Merged \n";  // to ";
+    // remaining_ring.print(std::cerr);
+    // std::cerr << '\n';
   }
   return true;
 }

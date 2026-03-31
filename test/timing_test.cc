@@ -16,11 +16,9 @@
 #include "osm/osm.h"
 #include "osm/parallel.h"
 
-#include "boost/fiber/all.hpp"
-
 TEST(timing, test) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/germany-latest.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
@@ -94,6 +92,7 @@ TEST(timing, test) {
   auto end2 = std::chrono::high_resolution_clock::now();
   auto duration_pass2 =
       std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
+
   std::cout << "\t Duration Pass1: " << duration_pass1.count()
             << "\t Duration Pass2: " << duration_pass2.count() << std::endl;
 }

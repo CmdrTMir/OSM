@@ -31,7 +31,6 @@ struct PolygonManager {
   template <typename Tags>
   inline bool is_area(Tags&& tags) {
     for (auto const& [key, value] : tags) {
-      // std::strcmp(type, "multipolygon")
       if (key == "type" && (value == "multipolygon" || value == "boundary")) {
         return true;
       }
@@ -147,6 +146,7 @@ struct PolygonManager {
     }
     worked = assemble.assembling_area_from_relation(r, ways, a);
     {
+      // accumulate all statistics
       std::lock_guard<std::mutex> lock(stats_mtx);
       all_stats += a.pa_stats;
     }

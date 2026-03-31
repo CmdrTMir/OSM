@@ -94,12 +94,13 @@ struct raw_reader {
     return buf{raw_size, *compressed};
   }
 
+  // std::size_t tell() const { return file_.view().size() - rest_.size(); }
+
   std::uint64_t get_offset() { return offset_; }
   void set_offset(std::uint64_t offset) { offset_ = offset; }
 
   void reset_reader() { rest_ = file_.view(); }
 
-  // auch für das andere mmap ding benutzen?
   cista::mmap file_;
   std::string_view rest_{file_.view()};
   std::uint64_t offset_;

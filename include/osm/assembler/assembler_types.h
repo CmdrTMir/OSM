@@ -142,6 +142,7 @@ struct NodeRefSegment {
     return first_noderef_.location() < other.first().location();
   }
 };  // struct NodeRefSegment
+
 inline bool outside_x_range(const NodeRefSegment& s1,
                             const NodeRefSegment& s2) noexcept {
   return s1.first().location().x() > s2.second().location().x();
@@ -460,6 +461,7 @@ struct SegmentList {
   /**
    * Extract all segments from all ways that make up this
    * multipolygon relation and add them to the list.
+   * Changed for loop, because relations are not filtered
    */
   template <typename Members>
   uint32_t extract_segments_from_ways(
@@ -471,9 +473,6 @@ struct SegmentList {
     assert(relation.members().size() >= ways.size());
 
     const std::size_t num_segments = get_num_segments(ways);
-    // if (problem_reporter) {
-    //   problem_reporter->set_nodes(num_segments);
-    // }
     segments_.reserve(num_segments);
 
     std::unordered_set<osm::object_id_type> ids;
@@ -666,6 +665,11 @@ struct rings_stack_element {
   }
 };  // struct rings_stack_element
 
+/**
+ * The area_pair struct stores all rings in one vector.
+ * "offsets" marks where rings begin.
+ * offsets[0] is always the outer ring.
+ */
 struct area_pair {
   std::vector<osm::NodeRef> area_part;
   std::vector<std::int64_t> offsets;
@@ -693,12 +697,16 @@ struct area_pair {
   }
 };
 
+/**
+ * The (multi)-polygon area.
+ * If from_way is true => only one area_pair
+ */
 struct polygon_area {
   std::int64_t origin_id;
   bool valid = false;
   std::vector<area_pair> area;
-  bool missing_flag = false;
-  bool from_way = false;
+  bool missing_flag = false;  // indicates missing ways in dataset
+  bool from_way = false;  // indicates that this polygon was built from a way
 
   assembler::area_stats pa_stats{};
 

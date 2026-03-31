@@ -114,7 +114,7 @@ inline bool point_in_polygon(const Point& pt, const std::vector<Point>& ring) {
 
 TEST(relation_tests, functionality) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};

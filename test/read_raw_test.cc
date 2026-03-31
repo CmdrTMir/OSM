@@ -3,20 +3,15 @@
 #include <string_view>
 
 #include "fmt/ranges.h"
-
 #include "gtest/gtest.h"
-
 #include "utl/progress_tracker.h"
 
-#include "osm/assembler/assembler_types.h"
 #include "osm/decoder.h"
 #include "osm/filing/tmp_file.h"
 #include "osm/hnidx/hybrid_node_index.h"
 #include "osm/inflate.h"
 #include "osm/memory.h"
-#include "osm/mp_manager.h"
 #include "osm/osm.h"
-#include "osm/parallel.h"
 
 #include "boost/fiber/all.hpp"
 
@@ -129,9 +124,9 @@ TEST(osm, read_raw_test) {
     t.join();
   }
 
-  std::cout << "number of nodes: " << n_nodes << "\n";  // 7674356
-  std::cout << "number of ways: " << n_ways << "\n";  // 1276568
-  std::cout << "number of relations: " << n_rels << "\n";  // 17929
+  std::cout << "number of nodes: " << n_nodes << "\n";
+  std::cout << "number of ways: " << n_ways << "\n";
+  std::cout << "number of relations: " << n_rels << "\n";
 
   const ium::MemoryUsage memory;
   std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";

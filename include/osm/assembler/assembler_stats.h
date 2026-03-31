@@ -59,19 +59,6 @@ struct area_stats {
   std::uint64_t wrong_role = 0;
   // Invalid location found
   std::uint64_t invalid_locations = 0;
-  /**
-   * When the assembler can't create an area, usually because its
-   * geometry would be invalid, it will create an "empty" area object
-   * without rings. This allows you to detect where an area was
-   * invalid.
-   * If this is set to false, invalid areas will simply be discarded.
-   */
-  bool create_empty_areas = true;
-  /**
-   * Create areas for polygons created from ways.
-   * If this is set to false, those areas will simply be discarded.
-   */
-  bool create_way_polygons = true;
 
   area_stats& operator+=(const area_stats& other) noexcept {
     area_really_complex_case += other.area_really_complex_case;

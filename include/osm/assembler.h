@@ -14,8 +14,9 @@ namespace assembler {
 struct assembly {
 
   State state_;
-  assembly(std::ostream* state = nullptr, bool debug_flag = false)
-      : state_(state, debug_flag) {}
+  assembly(std::ostream* pr = nullptr, bool debug_flag = false)
+      : state_(pr, debug_flag) {}
+
   // Definition of helper functions as members:
   uint32_t add_new_ring_complex(const slocation& node);
   std::uint32_t add_new_ring(const slocation& node);
@@ -88,7 +89,7 @@ struct assembly {
      * If there are any open rings found along the way, they are reported
      * and the function returns false.
      */
-    bool found_open_rings = false;  // bool found_split_locations = false;
+    bool found_open_rings = false;
     osm::Location previous_location;
     for (auto it = state_.slocations.cbegin(); it != state_.slocations.cend();
          ++it) {
@@ -273,7 +274,6 @@ struct assembly {
   /**
    * Assemble an area from the given way.
    * The resulting area is put into the out_buffer.
-   * added for completeness
    * @returns false if there was some kind of error building the
    *          area, true otherwise.
    */
@@ -297,7 +297,7 @@ struct assembly {
     state_.stats.invalid_locations =
         state_.segment_list.extract_segments_from_way(
             state_.problem_reporter, state_.stats.duplicate_nodes, way);
-    // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
+
     if (state_.stats.invalid_locations > 0) {
       return false;
     }
@@ -316,7 +316,6 @@ struct assembly {
   /**
    * Assemble an area from the given relation and its members.
    * The resulting area is put into the out_buffer.
-   *
    * @returns false if there was some kind of error building the
    *          area(s), true otherwise.
    */
@@ -335,7 +334,7 @@ struct assembly {
         state_.segment_list.extract_segments_from_ways(
             state_.problem_reporter, state_.stats.duplicate_nodes,
             state_.stats.duplicate_ways, relation, ways);
-    // if (!config().ignore_invalid_locations && stats_.invalid_locations > 0) {
+
     if (state_.stats.invalid_locations > 0) {
       return false;
     }

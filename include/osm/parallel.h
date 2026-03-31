@@ -11,10 +11,6 @@
 
 #include "utl/progress_tracker.h"
 
-#include "boost/fiber/all.hpp"
-#include "boost/lockfree/queue.hpp"
-#include <limits>
-
 namespace osm {
 
 template <typename NodeFn, typename WayFn, typename RelFn>
@@ -51,8 +47,11 @@ void decode_primitive_parallel(
       auto out = std::string{};
       auto strings = std::vector<std::string_view>{};
 
+      auto local_nodes = std::make_shared<std::vector<osm::Node>>();
+      local_nodes->reserve(10000);
+
       while (auto work = prod_queue.pop()) {
-        auto local_nodes = std::make_shared<std::vector<osm::Node>>();
+        local_nodes->clear();
         auto on_node_local = [&](std::int64_t const id, geo::latlng const& pos,
                                  auto&& tags) {
           osm::Location temp_loc = osm::Location(pos.lat(), pos.lng());
@@ -65,7 +64,9 @@ void decode_primitive_parallel(
         osm::decode_primitive(out, strings, read_nodes, read_ways,
                               read_relations, on_node_local, on_way, on_rel);
         if (read_nodes) {
-          merge_queue.push({work->block_id, local_nodes});
+          merge_queue.push({work->block_id, std::move(local_nodes)});
+          local_nodes = std::make_shared<std::vector<osm::Node>>();
+          local_nodes->reserve(10000);
         }
       }
     }};
@@ -77,16 +78,16 @@ void decode_primitive_parallel(
       int node_count = 0;
       int empty_node_count = 0;
       auto items_pending =
-          std::map<std::uint64_t, std::shared_ptr<std::vector<osm::Node>>>{};
+          std::unordered_map<std::uint64_t,
+                             std::shared_ptr<std::vector<osm::Node>>>{};
       while (auto item = merge_queue.pop()) {
         items_pending.emplace(item->block_id, std::move(item->nodes));
-        // normal map: if key is there count = 1
         while (items_pending.count(next_expected)) {
           auto& vec = items_pending[next_expected];
           if (vec->empty()) {
             empty_node_count++;
           }
-          for (auto& node : *vec) {
+          for (const auto& node : *vec) {
             node_index_builder.node(node);
             node_count++;
           }
@@ -121,6 +122,9 @@ void decode_primitive_parallel(
   }
   merge_queue.set_done();
   merger_thread.join();
+
+  // const ium::MemoryUsage memory;
+  // std::cout << "\nMemory used: " << memory.peak() << " MBytes\n";
 }
 
 }  // namespace osm

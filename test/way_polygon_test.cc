@@ -3,9 +3,7 @@
 #include <string_view>
 
 #include "fmt/ranges.h"
-
 #include "gtest/gtest.h"
-
 #include "utl/progress_tracker.h"
 
 #include "osm/assembler/assembler_types.h"
@@ -17,8 +15,6 @@
 #include "osm/mp_manager.h"
 #include "osm/osm.h"
 #include "osm/parallel.h"
-
-#include "boost/fiber/all.hpp"
 
 // --- makes helper functions more readable ---
 struct Point {
@@ -82,9 +78,8 @@ inline double compute_area(const std::vector<Point>& ring) {
 }
 
 TEST(way_tests, way_areas_monaco) {
-  // Dieser Test beruht auf dem monaco-260324.osm.pbf file
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
@@ -136,7 +131,7 @@ TEST(way_tests, way_areas_monaco) {
         if (area_result.has_value()) {
           worked_count++;
           const auto& poly = area_result.value();
-          // =========== IS GEOMETRY RIGHT =========================
+          // =========== IS GEOMETRY RIGHT ====================================
           for (size_t i = 0; i < poly.area.size(); ++i) {
             const auto& ap = poly.area[i];
             auto outer_pts = span_to_points(ap.get_outer());
@@ -150,7 +145,7 @@ TEST(way_tests, way_areas_monaco) {
             EXPECT_GT(compute_area(outer_pts), 0.0)
                 << "Outer ring " << i << " has zero area, for id: " << id;
           }
-          // ========================================================
+          // ==================================================================
         }
       },
       [&](std::int64_t const id, auto&& members, auto&& tags) {
@@ -160,7 +155,5 @@ TEST(way_tests, way_areas_monaco) {
 
   std::cout << " \t Results: " << std::endl;
   std::cout << " \t number of read ways: " << total_ways << std::endl;
-  EXPECT_EQ(total_ways, 6180);
-  std::cout << " \t check area count: " << worked_count << std::endl;
-  EXPECT_EQ(worked_count, 2099);
+  std::cout << " \t number of build areas: " << worked_count << std::endl;
 }

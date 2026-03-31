@@ -18,7 +18,7 @@
 
 TEST(relation_tests, relation_areas) {
   auto r = osm::raw_reader{
-      .file_ = cista::mmap{"/home/tmir/OSM/monaco-260324.osm.pbf",
+      .file_ = cista::mmap{"/home/tmir/OSM/berlin-251113.osm.pbf",
                            cista::mmap::protection::READ}};
 
   auto bars = utl::global_progress_bars{false};
@@ -101,14 +101,14 @@ TEST(relation_tests, relation_areas) {
         }
         if (!p_area.valid && p_area.missing_flag == true) {
           cannot++;
-          std::cout << "This realtion couldn't be assembled into an area, "
-                       "because ways are missing in the dataset: "
-                    << id << std::endl;
+          // std::cout << "This realtion couldn't be assembled into an area, "
+          //              "because ways are missing in the dataset: "
+          //           << id << std::endl;
         }
       },
       pt);
 
-  std::cout << "\t At the end: " << std::endl;
+  std::cout << "\t Results: " << std::endl;
   std::cout << "\t possible areas: " << mp_manager.mp_vec_.size()
             << "\t non areas: " << mp_manager.count_non_areas << std::endl;
   std::cout << "\t area count: " << worked_count

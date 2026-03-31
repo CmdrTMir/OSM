@@ -1,4 +1,5 @@
 #pragma once
+
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -12,7 +13,6 @@ struct LockQueue {
   std::condition_variable cv_;
   std::atomic<bool> done_ = false;
 
-public:
   LockQueue() = default;
 
   void push(T value) {
@@ -26,9 +26,9 @@ public:
 
   std::shared_ptr<T> pop() {
     std::unique_lock<std::mutex> lock(mtx_);
-    // aufwachen wenn entweder nicht leer ODER done
+    // wake up if either not empty OR done
     cv_.wait(lock, [&] { return !queue_.empty() || done_.load(); });
-    // done.load() war true + leer => nullptr
+    // done.load() true & empty => nullptr
     if (queue_.empty()) return nullptr;
     auto item = queue_.front();
     queue_.pop();

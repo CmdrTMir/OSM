@@ -10,6 +10,13 @@ namespace assembler {
 constexpr std::size_t max_split_locations_ = 100ULL;
 constexpr int max_depth = 20;
 
+/**
+ * This struct holds every information needed to build the multipolygon.
+ * The statistics and the ProblemReporter are also connected to each
+ * multipolygon assembly. To initialise the ProblemReporter and/or the debug
+ * flag, use the constructor of the assembly, when initialising it in the
+ * PolygonManager.
+ */
 struct State {
   State() = delete;
   State(const State&) = delete;
