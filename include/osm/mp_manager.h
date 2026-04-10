@@ -123,6 +123,9 @@ struct PolygonManager {
         ptrs.push_back(&(*it).second);
       }
     }
+    std::sort(
+        ptrs.begin(), ptrs.end(),
+        [](const osm::Way* a, const osm::Way* b) { return a->id < b->id; });
     return ptrs;
   }
 

@@ -695,6 +695,64 @@ struct area_pair {
     std::size_t end = area_part.size();
     return {area_part.data() + start, end - start};
   }
+
+  void rotate_to_smallest() {
+    // outer:
+    auto start_outer = offsets[0];
+    auto end_outer = (offsets.size() > 1) ? offsets[1] : area_part.size();
+    auto end = area_part.begin() + end_outer - 1;
+    auto min_it =
+        std::min_element(area_part.begin(), end,
+                         [](const osm::NodeRef& a, const osm::NodeRef& b) {
+                           return a.ref() < b.ref();
+                         });
+    auto rotation_offset = std::distance(area_part.begin(), min_it);
+    std::rotate(area_part.begin(), area_part.begin() + rotation_offset, end);
+    area_part[end - area_part.begin()] = area_part[0];
+    //  inners:
+    for (auto i = 1; i < offsets.size(); ++i) {
+      auto start_inner = offsets[i];
+      auto it_start = area_part.begin() + start_inner;
+      auto end_inner =
+          (i + 1 < offsets.size()) ? offsets[i + 1] : area_part.size();
+      auto it_end = area_part.begin() + end_inner - 1;
+      auto it_min = std::min_element(
+          it_start, it_end, [](const osm::NodeRef& a, const osm::NodeRef& b) {
+            return a.ref() < b.ref();
+          });
+      auto rotation_offset = std::distance(it_start, it_min);
+      std::rotate(it_start, it_start + rotation_offset, it_end);
+      area_part[it_end - area_part.begin()] = *it_start;
+    }
+  }
+
+  void reverse_outer_orientation() {
+    auto start_outer = offsets[0];
+    auto end_outer = (offsets.size() > 1) ? offsets[1] : area_part.size();
+    assert(start_outer == 0);
+    std::reverse(area_part.begin(), area_part.begin() + end_outer);
+  }
+
+  void reverse_inners_orientation() {
+    if (offsets.size() <= 1) {
+      return;
+    }
+    for (auto i = 1; i < offsets.size(); ++i) {
+      auto start_inner = offsets[i];
+      auto end_inner =
+          (i + 1 < offsets.size()) ? offsets[i + 1] : area_part.size();
+      std::reverse(area_part.begin() + start_inner,
+                   area_part.begin() + end_inner);
+    }
+  }
+
+  void reverse_complete_orientation() {
+    reverse_outer_orientation();
+    if (offsets.size() <= 1) {
+      return;
+    }
+    reverse_inners_orientation();
+  }
 };
 
 /**

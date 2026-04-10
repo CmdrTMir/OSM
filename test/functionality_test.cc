@@ -181,9 +181,35 @@ TEST(relation_tests, functionality) {
         assembler::polygon_area p_area =
             mp_manager.assemble_area(id, members, tags);
 
+        // if (p_area.valid) {
+        //   std::cout << "TEST START for id: " << id << std::endl;
+        //   std::cout << "for: " << p_area.area.size() << std::endl;
+        //   for (size_t i = 0; i < p_area.area.size(); ++i) {
+        //     auto pair1 = p_area.area.at(i);
+        //     pair1.reverse_complete_orientation();
+        //     pair1.rotate_to_smallest();
+        //     std::cout << "outer: [";
+        //     for (osm::NodeRef nr : pair1.get_outer()) {
+        //       std::cout << nr.ref_id << ", ";
+        //     }
+        //     std::cout << "] \n inners: " << pair1.offsets.size() - 1
+        //               << std::endl;
+        //     std::cout << "[";
+        //     for (int k = 0; k < pair1.offsets.size(); ++k) {
+        //       for (osm::NodeRef nrs : pair1.get_inner_at(k)) {
+        //         std::cout << nrs.ref_id << ", ";
+        //       }
+        //     }
+        //     std::cout << "]\n";
+        //   }
+        //   std::cout << std::endl;
+        // }
+
         // =========== IS GEOMETRY RIGHT =========================
         for (size_t i = 0; i < p_area.area.size(); ++i) {
-          const auto& ap = p_area.area[i];
+          auto& ap = p_area.area[i];
+          ap.reverse_complete_orientation();
+          ap.rotate_to_smallest();
           auto outer_pts = span_to_points(ap.get_outer());
           // check 1.
           EXPECT_TRUE(is_closed(outer_pts))
